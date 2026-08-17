@@ -1,0 +1,1217 @@
+﻿<!DOCTYPE html>
+<!--
+  大阪 DS 気象・防災 — 320キューブ向け 文字テロップ切替デモ
+  本番本体: wbgt-cube-kumamoto-4face.html（気象庁発表時のみ表示）
+  本ファイル: 見た目確認用。発表がある種別のみデモ表示（発表なしシーンは無し）。
+-->
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>防災テロップ切替デモ — 大阪 DS（320キューブ）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap">
+  <style>
+    :root {
+      --bg: #121214;
+      --panel: #1c1c22;
+      --line: #33333a;
+      --text: #f2f2f4;
+      --muted: #9a9aa3;
+      --accent: #ffe34d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #0e0e12;
+    }
+    header h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+    }
+    header p {
+      margin: 0 0 6px;
+      font-size: 13px;
+      color: var(--muted);
+      max-width: 820px;
+    }
+    header .rule {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 13px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 20px;
+      padding: 20px 22px 32px;
+      max-width: 1280px;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      main { grid-template-columns: 1fr; }
+    }
+    .stage-col { min-width: 0; }
+    .stage-sticky {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--bg);
+      padding-bottom: 8px;
+    }
+    .stage-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 8px;
+      letter-spacing: 0.04em;
+    }
+    .led-shell {
+      width: 512px;
+      max-width: 100%;
+      border: 2px solid #555;
+      background: #000;
+      overflow: hidden;
+      position: relative;
+    }
+    .led {
+      width: 512px;
+      height: 128px;
+      position: relative;
+      overflow: hidden;
+      font-family: "Noto Sans JP", sans-serif;
+      transform-origin: top left;
+    }
+    @media (max-width: 560px) {
+      .led {
+        transform: scale(calc((100vw - 48px) / 512));
+      }
+      .led-shell {
+        height: calc(128px * ((100vw - 48px) / 512));
+      }
+    }
+    .led-top {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      padding: 0;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: 0.04em;
+      position: relative;
+    }
+    .led-top-track {
+      display: flex;
+      white-space: nowrap;
+      will-change: transform;
+      align-items: center;
+      height: 100%;
+    }
+    .led-top-msg {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      height: 36px;
+      padding: 0 22px;
+      flex: 0 0 auto;
+      font-weight: 900;
+      font-size: 16px;
+    }
+    .led-top-msg .badge {
+      background: #fff;
+      color: #111;
+      font-size: 13px;
+      padding: 2px 8px;
+      line-height: 1.2;
+      flex-shrink: 0;
+    }
+    /* 警戒レベル1・2（白/黄）はバッジを反転 */
+    .theme-lv1 .led-top-msg .badge,
+    .theme-lv2 .led-top-msg .badge {
+      background: #111;
+      color: #fff;
+    }
+    .led-mid {
+      height: 56px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+    .led-track {
+      display: flex;
+      white-space: nowrap;
+      will-change: transform;
+    }
+    .led-chip {
+      display: inline-flex;
+      align-items: center;
+      height: 56px;
+      padding: 0 28px;
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      flex: 0 0 auto;
+    }
+    .led-bot {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      padding: 0 10px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .led-bot-track {
+      display: flex;
+      white-space: nowrap;
+      will-change: transform;
+    }
+    .led-bot-msg {
+      padding: 0 24px;
+      flex: 0 0 auto;
+    }
+    /*
+     * 気象庁・内閣府「警戒レベル」色
+     * L1 白 / L2 黄 / L3 赤 / L4 紫 / L5 黒
+     */
+    .theme-lv1 .led-top,
+    .theme-lv1 .led-bot { background: #FFFFFF; color: #111; }
+    .theme-lv1 .led-mid { background: #F0F0F0; color: #111; }
+    .theme-lv2 .led-top,
+    .theme-lv2 .led-bot { background: #F2E700; color: #111; }
+    .theme-lv2 .led-mid { background: #CDB800; color: #111; }
+    .theme-lv3 .led-top,
+    .theme-lv3 .led-bot { background: #FA2900; color: #fff; }
+    .theme-lv3 .led-mid { background: #C82400; color: #fff; }
+    .theme-lv4 .led-top,
+    .theme-lv4 .led-bot { background: #AB00AA; color: #fff; }
+    .theme-lv4 .led-mid { background: #7A0078; color: #fff; }
+    .theme-lv5 .led-top,
+    .theme-lv5 .led-bot { background: #000000; color: #fff; }
+    .theme-lv5 .led-mid { background: #111111; color: #FF5A5A; }
+    /* 緊急地震速報・熱中症は警戒レベル表外だが、緊急は黒／警戒は紫 */
+    .theme-quake .led-top,
+    .theme-quake .led-bot { background: #000000; color: #fff; }
+    .theme-quake .led-mid { background: #111111; color: #FF5A5A; }
+    .theme-heat .led-top,
+    .theme-heat .led-bot { background: #70006A; color: #FFE34D; }
+    .theme-heat .led-mid { background: #50004C; color: #fff; }
+    .theme-heat-special .led-top,
+    .theme-heat-special .led-bot { background: #000000; color: #FF5A5A; }
+    .theme-heat-special .led-mid { background: #111111; color: #fff; }
+    /* その他気象（レベルなし）: 注意報=黄 / 警報=赤 / 特別警報=黒 */
+    .theme-adv .led-top,
+    .theme-adv .led-bot { background: #F2E700; color: #111; }
+    .theme-adv .led-mid { background: #CDB800; color: #111; }
+    .theme-adv .led-top-msg .badge { background: #111; color: #fff; }
+    .theme-warn .led-top,
+    .theme-warn .led-bot { background: #FA2900; color: #fff; }
+    .theme-warn .led-mid { background: #C82400; color: #fff; }
+    .theme-sp .led-top,
+    .theme-sp .led-bot { background: #000000; color: #fff; }
+    .theme-sp .led-mid { background: #111111; color: #FF5A5A; }
+
+    .ctrl-group {
+      flex: 1 0 100%;
+      margin: 8px 0 2px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #ffe34d;
+      letter-spacing: 0.04em;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 10px;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 48px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid #444;
+    }
+    .legend .l1 { background: #fff; color: #111; }
+    .legend .l2 { background: #F2E700; color: #111; }
+    .legend .l3 { background: #FA2900; color: #fff; }
+    .legend .l4 { background: #AB00AA; color: #fff; }
+    .legend .l5 { background: #000; color: #fff; }
+
+    .filter-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 12px 0 8px;
+    }
+    .filter-tabs button {
+      appearance: none;
+      border: 1px solid #555;
+      background: var(--panel);
+      color: var(--muted);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+    .filter-tabs button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #2a2610;
+    }
+    .controls {
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: min(48vh, 420px);
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid var(--line);
+      background: #16161c;
+    }
+    .controls button {
+      appearance: none;
+      border: 1px solid #555;
+      background: var(--panel);
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .controls button.active {
+      border-color: var(--accent);
+      background: #2a2610;
+      color: var(--accent);
+    }
+    .controls button:hover { border-color: #888; }
+    .controls button[hidden],
+    .ctrl-group[hidden] { display: none !important; }
+    .side-jump {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .side-jump button {
+      appearance: none;
+      text-align: left;
+      border: 1px solid #3a3a44;
+      background: #15151a;
+      color: #d8d8e0;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 8px;
+      cursor: pointer;
+    }
+    .side-jump button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .side-jump button:hover { border-color: #888; }
+    .meta-row {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .meta-row strong { color: var(--text); }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .side h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: var(--accent);
+    }
+    .side section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .side ul {
+      margin: 0;
+      padding-left: 1.15em;
+      font-size: 13px;
+      color: #c8c8d0;
+    }
+    .side li { margin: 0 0 6px; }
+    .side .ok { color: #8dffa8; }
+    .side .no { color: #ff9a9a; }
+    .side a { color: #7ec8ff; }
+    .now-card {
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+      margin-bottom: 10px;
+    }
+    .now-card .k { font-size: 12px; color: var(--muted); }
+    .now-card .v { font-size: 18px; font-weight: 900; margin-top: 2px; }
+    .now-card .d { font-size: 13px; color: #ddd; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>防災テロップ切替デモ（320キューブ / 文字告知）</h1>
+  <p>512×128 の文字テロップ切替デモ。警戒レベル対象は4種のみ。その他気象は特別警報・警報・注意報で表示します。</p>
+  <p class="rule">本番ルール：気象庁などから発表があるときだけ表示。発表がなければ何も出さない。</p>
+  <div class="legend" aria-label="警戒レベル色（4種のみ）">
+    <span class="l1">レベル1 白</span>
+    <span class="l2">レベル2 黄</span>
+    <span class="l3">レベル3 赤</span>
+    <span class="l4">レベル4 紫</span>
+    <span class="l5">レベル5 黒</span>
+  </div>
+  <p class="rule" style="margin-top:6px">警戒レベル対象：河川氾濫・大雨浸水・土砂災害・高潮　／　その他気象：注意報（黄）・警報（赤）・特別警報（黒）※レベル番号なし</p>
+</header>
+
+<main>
+  <section class="stage-col">
+    <div class="stage-sticky">
+      <p class="stage-label">LED プレビュー 512×128（本番4面と同じ幅）／下の一覧から全項目を選べます</p>
+      <div class="led-shell">
+        <div class="led theme-lv3" id="led" aria-live="polite">
+          <div class="led-top">
+            <div class="led-top-track" id="ledTopTrack"></div>
+          </div>
+          <div class="led-mid">
+            <div class="led-track" id="ledTrack"></div>
+          </div>
+          <div class="led-bot">
+            <div class="led-bot-track" id="ledBotTrack"></div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-tabs" id="filterTabs" aria-label="表示グループ">
+        <button type="button" data-filter="all" class="active">すべて</button>
+        <button type="button" data-filter="alert">① 警戒レベル4種</button>
+        <button type="button" data-filter="weather">② その他気象15種</button>
+        <button type="button" data-filter="other">③ 避難・地震など</button>
+      </div>
+    </div>
+
+    <div class="controls" id="controls"></div>
+    <div class="meta-row">
+      <span>いまの表示: <strong id="nowName">—</strong></span>
+      <span>切替まで <strong id="countdown">8</strong> 秒</span>
+      <label class="toggle"><input type="checkbox" id="autoPlay" checked> 自動切替</label>
+      <a href="./wbgt-cube-kumamoto-4face.html?demo=rainwarn" target="_blank" rel="noopener">本番サイネージで警報デモ</a>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section>
+      <div class="now-card">
+        <div class="k">現在デモ中</div>
+        <div class="v" id="sideTitle">—</div>
+        <div class="d" id="sideDesc">—</div>
+      </div>
+      <h2>表示の仕組み</h2>
+      <ul>
+        <li class="ok">発表中だけ流す（注意報→警報→危険警報→特別警報）</li>
+        <li class="ok">全一覧のうち<strong>発表されている項目のみ</strong>を横スクロール</li>
+        <li class="ok">警戒レベル数字は4種のみ。その他は警報階層のみ</li>
+        <li class="no">未発表・解除済み → 出さない</li>
+      </ul>
+    </section>
+    <section>
+      <h2>① 警戒レベル対象（クリックで表示）</h2>
+      <div class="side-jump" id="sideAlert"></div>
+    </section>
+    <section>
+      <h2>② その他気象（クリックで表示）</h2>
+      <div class="side-jump" id="sideWeather"></div>
+    </section>
+    <section>
+      <h2>③ 避難・熱中症・地震・津波</h2>
+      <div class="side-jump" id="sideOther"></div>
+    </section>
+    <section>
+      <h2>本番リンク</h2>
+      <ul>
+        <li><a href="./wbgt-cube-kumamoto-4face.html">本番（発表時のみ割り込み）</a></li>
+        <li><a href="./wbgt-cube-kumamoto-4face.html?demo=rainwarn">警報白帯デモ</a></li>
+        <li><a href="./wbgt-cube-kumamoto-4face.html?demo=alert">熱中症アラートデモ</a></li>
+        <li><a href="./wbgt-cube-kumamoto-4face.html?evac=all">避難情報デモ（L3〜5）</a></li>
+        <li><a href="./wbgt-cube-kumamoto-4face.html?rainwarn=3&amp;warntype=blizzard">暴風雪警報デモ</a></li>
+        <li><a href="./wbgt-cube-kumamoto-4face.html?rainwarn=3&amp;warntype=eew&amp;mag=7.4&amp;shindo=7">緊急地震速報デモ（震度・M）</a></li>
+        <li><a href="./wbgt-cube-kumamoto-4face.html?rainwarn=3&amp;warntype=quake&amp;mag=7.4&amp;shindo=7">地震情報デモ（発生後）</a></li>
+      </ul>
+    </section>
+  </aside>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /**
+   * デモ用シナリオ（発表時のみ表示）
+   * ① 警戒レベル対象4種: 河川氾濫 / 大雨浸水 / 土砂災害 / 高潮
+   * ② その他気象15種: 特別警報・警報・注意報のみ（レベル番号なし）
+   * ③ 避難・熱中症・地震・津波など
+   */
+  var SCENES = [
+    /* ===== ① 警戒レベル対象（4種） ===== */
+    {
+      id: 'early',
+      group: 'alert', groupLabel: '① 警戒レベル対象（4種）',
+      theme: 'theme-lv1',
+      btn: 'L1 早期注意',
+      level: '警戒レベル1　早期注意情報',
+      title: '早期注意情報',
+      chips: ['早期注意情報', '今後の気象情報に注意', '災害への備えを確認'],
+      foot: '大阪市　気象庁　早期注意情報（警報級の可能性）',
+      desc: '警戒レベル1。河川氾濫・大雨浸水・土砂・高潮の事前注意。'
+    },
+    {
+      id: 'flood-adv',
+      group: 'alert',
+      theme: 'theme-lv2',
+      btn: 'L2 河川氾濫',
+      level: '警戒レベル2　氾濫注意報',
+      title: '河川氾濫（注意報）',
+      chips: ['河川氾濫に注意', '氾濫注意報', '川や用水路に近づかない'],
+      foot: '大阪市　気象庁発表　氾濫注意報　警戒レベル2',
+      desc: '警戒レベル対象① 河川氾濫。'
+    },
+    {
+      id: 'flood',
+      group: 'alert',
+      theme: 'theme-lv3',
+      btn: 'L3 河川氾濫',
+      level: '警戒レベル3　氾濫警報',
+      title: '河川氾濫（警報）',
+      chips: ['河川氾濫に警戒', '氾濫警報', '低い土地の浸水に注意'],
+      foot: '大阪市　気象庁発表　氾濫警報　警戒レベル3',
+      desc: '警戒レベル対象① 河川氾濫。'
+    },
+    {
+      id: 'flood-danger',
+      group: 'alert',
+      theme: 'theme-lv4',
+      btn: 'L4 河川氾濫',
+      level: '警戒レベル4　氾濫危険警報',
+      title: '河川氾濫（危険警報）',
+      chips: ['氾濫危険警報', '危険な場所から全員避難', '直ちに安全な場所へ'],
+      foot: '大阪市　河川　氾濫危険警報　警戒レベル4',
+      desc: '警戒レベル対象① 河川氾濫。'
+    },
+    {
+      id: 'flood-occur',
+      group: 'alert',
+      theme: 'theme-lv5',
+      btn: 'L5 河川氾濫',
+      level: '警戒レベル5　氾濫特別警報',
+      title: '河川氾濫（特別警報）',
+      chips: ['氾濫特別警報', '命を守る最善の行動を', '浸水に巻き込まれないでください'],
+      foot: '大阪市　河川　氾濫特別警報　警戒レベル5',
+      desc: '警戒レベル対象① 河川氾濫。'
+    },
+    {
+      id: 'rain-adv',
+      group: 'alert',
+      theme: 'theme-lv2',
+      btn: 'L2 大雨浸水',
+      level: '警戒レベル2　大雨注意報',
+      title: '大雨浸水（大雨注意報）',
+      chips: ['大雨浸水に注意', '大雨注意報', '避難の準備を'],
+      foot: '大阪市　気象庁発表　大雨注意報　警戒レベル2',
+      desc: '警戒レベル対象② 大雨浸水。'
+    },
+    {
+      id: 'heavyrain',
+      group: 'alert',
+      theme: 'theme-lv3',
+      btn: 'L3 大雨浸水',
+      level: '警戒レベル3　大雨警報',
+      title: '大雨浸水（大雨警報）',
+      chips: ['大雨浸水に警戒', '大雨警報', '低い土地では浸水に注意'],
+      foot: '大阪市　気象庁発表　大雨警報　警戒レベル3',
+      desc: '警戒レベル対象② 大雨浸水。'
+    },
+    {
+      id: 'rain-danger',
+      group: 'alert',
+      theme: 'theme-lv4',
+      btn: 'L4 大雨浸水',
+      level: '警戒レベル4　大雨危険警報',
+      title: '大雨浸水（危険）',
+      chips: ['大雨浸水の危険', '危険な場所から全員避難', '命を守る行動を'],
+      foot: '大阪市　気象庁　大雨危険警報　警戒レベル4',
+      desc: '警戒レベル対象② 大雨浸水。'
+    },
+    {
+      id: 'rain-special',
+      group: 'alert',
+      theme: 'theme-lv5',
+      btn: 'L5 大雨浸水',
+      level: '警戒レベル5　大雨特別警報',
+      title: '大雨浸水（特別警報）',
+      chips: ['大雨特別警報', '命を守る最善の行動を', '今いる場所で安全を確保'],
+      foot: '大阪府　気象庁発表　大雨特別警報　警戒レベル5',
+      desc: '警戒レベル対象② 大雨浸水。'
+    },
+    {
+      id: 'landslide-adv',
+      group: 'alert',
+      theme: 'theme-lv2',
+      btn: 'L2 土砂災害',
+      level: '警戒レベル2　土砂災害注意報',
+      title: '土砂災害（注意報）',
+      chips: ['土砂災害に注意', '崖や斜面から離れてください', '気象情報を確認'],
+      foot: '大阪府　土砂災害注意報　警戒レベル2',
+      desc: '警戒レベル対象③ 土砂災害。'
+    },
+    {
+      id: 'landslide-l3',
+      group: 'alert',
+      theme: 'theme-lv3',
+      btn: 'L3 土砂災害',
+      level: '警戒レベル3　土砂災害警報',
+      title: '土砂災害警報',
+      chips: ['土砂災害警報', '高齢者等は避難を開始', '崖や斜面から離れてください'],
+      foot: '大阪府　土砂災害警報　警戒レベル3',
+      desc: '警戒レベル対象③ 土砂災害。'
+    },
+    {
+      id: 'landslide',
+      group: 'alert',
+      theme: 'theme-lv4',
+      btn: 'L4 土砂災害',
+      level: '警戒レベル4　土砂災害危険警報',
+      title: '土砂災害危険警報',
+      chips: ['土砂災害危険警報', '危険な場所から全員避難', '崖や斜面から離れてください'],
+      foot: '大阪府　土砂災害危険警報　警戒レベル4',
+      desc: '警戒レベル対象③ 土砂災害。'
+    },
+    {
+      id: 'landslide-special',
+      group: 'alert',
+      theme: 'theme-lv5',
+      btn: 'L5 土砂災害',
+      level: '警戒レベル5　土砂災害特別警報',
+      title: '土砂災害特別警報',
+      chips: ['土砂災害特別警報', '命を守る最善の行動を', '今いる場所で安全を確保'],
+      foot: '大阪府　土砂災害特別警報　警戒レベル5',
+      desc: '警戒レベル対象③ 土砂災害。'
+    },
+    {
+      id: 'surge-l2',
+      group: 'alert',
+      theme: 'theme-lv2',
+      btn: 'L2 高潮',
+      level: '警戒レベル2　高潮注意報',
+      title: '高潮（注意報）',
+      chips: ['高潮に注意', '高潮注意報', '海岸から離れてください'],
+      foot: '大阪市沿岸　気象庁発表　高潮注意報　警戒レベル2',
+      desc: '警戒レベル対象④ 高潮。'
+    },
+    {
+      id: 'surge-adv',
+      group: 'alert',
+      theme: 'theme-lv3',
+      btn: 'L3 高潮',
+      level: '警戒レベル3　高潮警報',
+      title: '高潮（警報）',
+      chips: ['高潮警報', '海岸から離れてください', '浸水に備えてください'],
+      foot: '大阪市沿岸　気象庁発表　高潮警報　警戒レベル3',
+      desc: '警戒レベル対象④ 高潮。'
+    },
+    {
+      id: 'surge',
+      group: 'alert',
+      theme: 'theme-lv4',
+      btn: 'L4 高潮',
+      level: '警戒レベル4　高潮危険警報',
+      title: '高潮（危険警報）',
+      chips: ['高潮危険警報', '浸水の危険があります', '高い場所へ避難してください'],
+      foot: '大阪市沿岸　気象庁発表　高潮危険警報　警戒レベル4',
+      desc: '警戒レベル対象④ 高潮。'
+    },
+    {
+      id: 'surge-special',
+      group: 'alert',
+      theme: 'theme-lv5',
+      btn: 'L5 高潮',
+      level: '警戒レベル5　高潮特別警報',
+      title: '高潮（特別警報）',
+      chips: ['高潮特別警報', '命を守る最善の行動を', '今いる場所で安全を確保'],
+      foot: '大阪市沿岸　気象庁発表　高潮特別警報　警戒レベル5',
+      desc: '警戒レベル対象④ 高潮。'
+    },
+
+    /* ===== ② その他気象（15種・レベル番号なし） ===== */
+    {
+      id: 'wind-adv',
+      group: 'weather', groupLabel: '② その他気象（15種・レベルなし）',
+      theme: 'theme-adv',
+      btn: '注意 強風',
+      level: '注意報　強風',
+      title: '強風注意報',
+      chips: ['強風注意報', '飛来物に注意', '外出時は風に警戒'],
+      foot: '大阪市　気象庁発表　強風注意報',
+      desc: 'その他気象。注意報のときは「強風」。レベル番号は出さない。'
+    },
+    {
+      id: 'wind',
+      group: 'weather',
+      theme: 'theme-warn',
+      btn: '警報 暴風',
+      level: '警報　暴風',
+      title: '暴風警報',
+      chips: ['暴風警報', '不要不急の外出を控えてください', '窓や戸を補強し室内で待機'],
+      foot: '大阪市　気象庁発表　暴風警報',
+      desc: 'その他気象。警報は「暴風」。レベル番号なし。'
+    },
+    {
+      id: 'snowdrift',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 風雪',
+      level: '注意報　風雪',
+      title: '風雪注意報',
+      chips: ['風雪注意報', '視界不良に注意', '外出を控えてください'],
+      foot: '気象庁発表　風雪注意報',
+      desc: 'その他気象。注意報のときは「風雪」。'
+    },
+    {
+      id: 'blizzard',
+      group: 'weather',
+      theme: 'theme-warn',
+      btn: '警報 暴風雪',
+      level: '警報　暴風雪',
+      title: '暴風雪警報',
+      chips: ['暴風雪警報', '外出を控えてください', '視界不良に注意'],
+      foot: '気象庁発表　暴風雪警報',
+      desc: 'その他気象。警報は「暴風雪」。'
+    },
+    {
+      id: 'wave-adv',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 波浪',
+      level: '注意報　波浪',
+      title: '波浪注意報',
+      chips: ['波浪注意報', '海岸や防波堤に近づかない', '高波に注意'],
+      foot: '大阪湾周辺　気象庁発表　波浪注意報',
+      desc: 'その他気象。波浪。レベル番号なし。'
+    },
+    {
+      id: 'wave',
+      group: 'weather',
+      theme: 'theme-warn',
+      btn: '警報 波浪',
+      level: '警報　波浪',
+      title: '波浪警報',
+      chips: ['波浪警報', '海岸や防波堤に近づかない', '高波に巻き込まれないでください'],
+      foot: '大阪湾周辺　気象庁発表　波浪警報',
+      desc: 'その他気象。波浪。'
+    },
+    {
+      id: 'snow-adv',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 大雪',
+      level: '注意報　大雪',
+      title: '大雪注意報',
+      chips: ['大雪注意報', '足元と交通にご注意', '積雪に備えてください'],
+      foot: '気象庁発表　大雪注意報',
+      desc: 'その他気象。大雪。'
+    },
+    {
+      id: 'snow',
+      group: 'weather',
+      theme: 'theme-warn',
+      btn: '警報 大雪',
+      level: '警報　大雪',
+      title: '大雪警報',
+      chips: ['大雪警報', '足元と交通にご注意', '無理な外出は控えてください'],
+      foot: '気象庁発表　大雪警報',
+      desc: 'その他気象。大雪。'
+    },
+    {
+      id: 'fog',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 濃霧',
+      level: '注意報　濃霧',
+      title: '濃霧注意報',
+      chips: ['濃霧注意報', '視界不良に注意', '交通にご注意ください'],
+      foot: '気象庁発表　濃霧注意報',
+      desc: 'その他気象。濃霧。'
+    },
+    {
+      id: 'thunder',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 雷',
+      level: '注意報　雷',
+      title: '雷注意報',
+      chips: ['雷注意報', '建物の中へ避難してください', '樹木や高い柱から離れてください'],
+      foot: '大阪市　気象庁発表　雷注意報',
+      desc: 'その他気象。雷。'
+    },
+    {
+      id: 'dry',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 乾燥',
+      level: '注意報　乾燥',
+      title: '乾燥注意報',
+      chips: ['乾燥注意報', '火の取り扱いに注意', '火災に警戒してください'],
+      foot: '気象庁発表　乾燥注意報',
+      desc: 'その他気象。乾燥。'
+    },
+    {
+      id: 'avalanche',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 なだれ',
+      level: '注意報　なだれ',
+      title: 'なだれ注意報',
+      chips: ['なだれ注意報', '斜面に近づかないでください', '山沿いでは警戒を'],
+      foot: '気象庁発表　なだれ注意報',
+      desc: 'その他気象。なだれ。'
+    },
+    {
+      id: 'ice',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 着氷',
+      level: '注意報　着氷',
+      title: '着氷注意報',
+      chips: ['着氷注意報', '電線や船体の着氷に注意', '交通・通信への影響に注意'],
+      foot: '気象庁発表　着氷注意報',
+      desc: 'その他気象。着氷。'
+    },
+    {
+      id: 'snowacc',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 着雪',
+      level: '注意報　着雪',
+      title: '着雪注意報',
+      chips: ['着雪注意報', '電線や樹木の着雪に注意', '停電などに注意'],
+      foot: '気象庁発表　着雪注意報',
+      desc: 'その他気象。着雪。'
+    },
+    {
+      id: 'frost',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 霜',
+      level: '注意報　霜',
+      title: '霜注意報',
+      chips: ['霜注意報', '農作物の管理に注意', '低温による霜に警戒'],
+      foot: '気象庁発表　霜注意報',
+      desc: 'その他気象。霜。'
+    },
+    {
+      id: 'lowtemp',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 低温',
+      level: '注意報　低温',
+      title: '低温注意報',
+      chips: ['低温注意報', '水道管の凍結に注意', '体調管理にご注意ください'],
+      foot: '気象庁発表　低温注意報',
+      desc: 'その他気象。低温。'
+    },
+    {
+      id: 'snowmelt',
+      group: 'weather',
+      theme: 'theme-adv',
+      btn: '注意 融雪',
+      level: '注意報　融雪',
+      title: '融雪注意報',
+      chips: ['融雪注意報', '雪解けによる出水に注意', '低い土地の浸水に注意'],
+      foot: '気象庁発表　融雪注意報',
+      desc: 'その他気象。融雪。'
+    },
+    {
+      id: 'wind-special',
+      group: 'weather',
+      theme: 'theme-sp',
+      btn: '特別 暴風',
+      level: '特別警報　暴風',
+      title: '暴風特別警報',
+      chips: ['暴風特別警報', '命を守る最善の行動を', '頑丈な建物内で待機'],
+      foot: '気象庁発表　暴風特別警報',
+      desc: 'その他気象の特別警報。レベル番号は出さない。'
+    },
+    {
+      id: 'blizzard-special',
+      group: 'weather',
+      theme: 'theme-sp',
+      btn: '特別 暴風雪',
+      level: '特別警報　暴風雪',
+      title: '暴風雪特別警報',
+      chips: ['暴風雪特別警報', '命を守る最善の行動を', '外出を控えてください'],
+      foot: '気象庁発表　暴風雪特別警報',
+      desc: 'その他気象の特別警報。'
+    },
+    {
+      id: 'wave-special',
+      group: 'weather',
+      theme: 'theme-sp',
+      btn: '特別 波浪',
+      level: '特別警報　波浪',
+      title: '波浪特別警報',
+      chips: ['波浪特別警報', '海岸から離れてください', '命を守る行動を'],
+      foot: '気象庁発表　波浪特別警報',
+      desc: 'その他気象の特別警報。'
+    },
+    {
+      id: 'snow-special',
+      group: 'weather',
+      theme: 'theme-sp',
+      btn: '特別 大雪',
+      level: '特別警報　大雪',
+      title: '大雪特別警報',
+      chips: ['大雪特別警報', '命を守る最善の行動を', '無理な外出は控えてください'],
+      foot: '気象庁発表　大雪特別警報',
+      desc: 'その他気象の特別警報。'
+    },
+
+    /* ===== ③ 避難・熱中症・地震・津波 ===== */
+    {
+      id: 'evac3',
+      group: 'other', groupLabel: '③ 避難・熱中症・地震・津波',
+      theme: 'theme-lv3',
+      btn: '避難 L3',
+      level: '警戒レベル3　高齢者等避難',
+      title: '高齢者等避難',
+      chips: ['高齢者等避難', '避難に時間がかかる方は避難を開始', '避難場所と経路を確認'],
+      foot: '大阪市住之江区　避難情報　警戒レベル3',
+      desc: '自治体発表の避難情報（警戒レベル3）。'
+    },
+    {
+      id: 'evac4',
+      group: 'other',
+      theme: 'theme-lv4',
+      btn: '避難 L4',
+      level: '警戒レベル4　避難指示',
+      title: '避難指示',
+      chips: ['避難指示', '危険な場所から全員避難', '直ちに安全な場所へ'],
+      foot: '大阪市住之江区　避難情報　警戒レベル4',
+      desc: '自治体発表の避難情報（警戒レベル4）。'
+    },
+    {
+      id: 'evac5',
+      group: 'other',
+      theme: 'theme-lv5',
+      btn: '避難 L5',
+      level: '警戒レベル5　緊急安全確保',
+      title: '緊急安全確保',
+      chips: ['緊急安全確保', '命を守る最善の行動を', '今いる場所で安全を確保'],
+      foot: '大阪市住之江区　避難情報　警戒レベル5',
+      desc: '自治体発表の避難情報（警戒レベル5）。'
+    },
+    {
+      id: 'heat',
+      group: 'other',
+      theme: 'theme-heat',
+      btn: '熱中症警戒',
+      level: '熱中症警戒アラート',
+      title: '熱中症警戒アラート',
+      chips: ['熱中症警戒アラート発表', 'こまめに休憩と水分補給', '無理な作業は中止してください'],
+      foot: '大阪府　環境省・気象庁　熱中症警戒アラート',
+      desc: '環境省発表。警戒レベル表外。'
+    },
+    {
+      id: 'heat-special',
+      group: 'other',
+      theme: 'theme-heat-special',
+      btn: '熱中症特別警戒',
+      level: '熱中症特別警戒アラート',
+      title: '熱中症特別警戒アラート',
+      chips: ['熱中症特別警戒アラート発表', '危険な暑さです', '屋外での活動は原則中止'],
+      foot: '大阪府　環境省・気象庁　熱中症特別警戒アラート',
+      desc: '環境省発表。特別警戒。'
+    },
+    {
+      id: 'tsunami',
+      group: 'other',
+      theme: 'theme-sp',
+      btn: '津波警報',
+      level: '津波警報',
+      title: '津波警報',
+      chips: ['津波警報', '直ちに高い場所へ避難', '海岸から離れてください'],
+      foot: '沿岸部　気象庁発表　津波警報',
+      desc: '津波は警戒レベル表外。警報として表示。'
+    },
+    {
+      id: 'eew',
+      group: 'other',
+      theme: 'theme-quake',
+      btn: '緊急地震速報',
+      level: '緊急地震速報　予想最大震度7',
+      title: '緊急地震速報',
+      chips: ['緊急地震速報', '予想最大震度7', 'マグニチュード7.4', '落ち着いて身を守ってください'],
+      foot: '強い揺れに警戒　気象庁　緊急地震速報',
+      desc: '地震速報。震度・マグニチュードを表示。'
+    },
+    {
+      id: 'quake',
+      group: 'other',
+      theme: 'theme-quake',
+      btn: '地震情報',
+      level: '地震情報　最大震度7',
+      title: '地震情報（発生後）',
+      chips: ['地震情報', '最大震度7', 'マグニチュード7.4', '大阪市で強い揺れ', '身の安全を確保してください'],
+      foot: '気象庁発表　震源・震度に関する情報　M7.4　最大震度7',
+      desc: '地震発生後。マグニチュードと震度を表示。'
+    }
+  ];
+
+  var led = document.getElementById('led');
+  var ledTopTrack = document.getElementById('ledTopTrack');
+  var ledTrack = document.getElementById('ledTrack');
+  var ledBotTrack = document.getElementById('ledBotTrack');
+  var controls = document.getElementById('controls');
+  var filterTabs = document.getElementById('filterTabs');
+  var nowName = document.getElementById('nowName');
+  var countdownEl = document.getElementById('countdown');
+  var autoPlayEl = document.getElementById('autoPlay');
+  var sideTitle = document.getElementById('sideTitle');
+  var sideDesc = document.getElementById('sideDesc');
+  var sideAlert = document.getElementById('sideAlert');
+  var sideWeather = document.getElementById('sideWeather');
+  var sideOther = document.getElementById('sideOther');
+
+  var idx = 0;
+  var filter = 'all';
+  var buttonEls = [];
+  var sideJumpEls = [];
+  var xTop = 0;
+  var xMid = 0;
+  var xBot = 0;
+  var topW = 512;
+  var midW = 512;
+  var botW = 512;
+  var rafId = null;
+  var secLeft = 8;
+  var tickTimer = null;
+
+  function buildDupTrack(texts, className) {
+    var html = '';
+    var i;
+    for (i = 0; i < 2; i++) {
+      texts.forEach(function (t) {
+        html += '<span class="' + className + '">' + escapeHtml(t) + '</span>';
+      });
+    }
+    return html;
+  }
+
+  function buildTopTrack(levelText) {
+    var badge = '<span class="badge">発表中</span>';
+    var label = escapeHtml(levelText || '');
+    var unit = '<span class="led-top-msg"><span>' + label + '</span>' + badge + '</span>';
+    /* 短いラベルでも帯が途切れないよう十分な繰り返し */
+    return unit + unit + unit + unit + unit + unit;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function measureHalfWidth(trackEl, itemSel) {
+    var items = trackEl.querySelectorAll(itemSel);
+    if (!items.length) return 512;
+    var n = Math.max(1, Math.floor(items.length / 2));
+    var w = 0;
+    var i;
+    for (i = 0; i < n; i++) w += items[i].getBoundingClientRect().width;
+    return Math.max(256, Math.ceil(w));
+  }
+
+  function applyScene(i) {
+    var sc = SCENES[i];
+    if (!sc) return;
+    idx = i;
+    led.className = 'led ' + sc.theme;
+    ledTopTrack.innerHTML = buildTopTrack(sc.level);
+    ledTrack.innerHTML = buildDupTrack(sc.chips, 'led-chip');
+    ledBotTrack.innerHTML = buildDupTrack([sc.foot, sc.foot], 'led-bot-msg');
+    topW = measureHalfWidth(ledTopTrack, '.led-top-msg');
+    midW = measureHalfWidth(ledTrack, '.led-chip');
+    botW = measureHalfWidth(ledBotTrack, '.led-bot-msg');
+    xTop = 0;
+    xMid = 0;
+    xBot = 0;
+    ledTopTrack.style.transform = 'translate3d(0,0,0)';
+    ledTrack.style.transform = 'translate3d(0,0,0)';
+    ledBotTrack.style.transform = 'translate3d(0,0,0)';
+    nowName.textContent = sc.btn + ' / ' + sc.title;
+    sideTitle.textContent = sc.title;
+    sideDesc.textContent = sc.desc;
+    buttonEls.forEach(function (b) {
+      b.classList.toggle('active', Number(b.getAttribute('data-idx')) === i);
+    });
+    sideJumpEls.forEach(function (b) {
+      b.classList.toggle('active', Number(b.getAttribute('data-idx')) === i);
+    });
+    secLeft = 8;
+    countdownEl.textContent = String(secLeft);
+  }
+
+  function visibleSceneIndexes() {
+    var list = [];
+    SCENES.forEach(function (sc, i) {
+      if (filter === 'all' || sc.group === filter) list.push(i);
+    });
+    return list.length ? list : [0];
+  }
+
+  function applyFilter(next) {
+    filter = next || 'all';
+    Array.prototype.forEach.call(filterTabs.querySelectorAll('button'), function (b) {
+      b.classList.toggle('active', b.getAttribute('data-filter') === filter);
+    });
+    Array.prototype.forEach.call(controls.children, function (el) {
+      var g = el.getAttribute('data-group');
+      if (!g) return;
+      el.hidden = !(filter === 'all' || g === filter);
+    });
+    var vis = visibleSceneIndexes();
+    if (vis.indexOf(idx) < 0) applyScene(vis[0]);
+  }
+
+  function stepAnim() {
+    xTop -= 0.85;
+    xMid -= 1.1;
+    xBot -= 0.7;
+    if (xTop <= -topW) xTop += topW;
+    if (xMid <= -midW) xMid += midW;
+    if (xBot <= -botW) xBot += botW;
+    ledTopTrack.style.transform = 'translate3d(' + Math.round(xTop) + 'px,0,0)';
+    ledTrack.style.transform = 'translate3d(' + Math.round(xMid) + 'px,0,0)';
+    ledBotTrack.style.transform = 'translate3d(' + Math.round(xBot) + 'px,0,0)';
+    rafId = requestAnimationFrame(stepAnim);
+  }
+
+  function nextScene() {
+    var vis = visibleSceneIndexes();
+    var pos = vis.indexOf(idx);
+    var next = vis[(pos < 0 ? 0 : pos + 1) % vis.length];
+    applyScene(next);
+  }
+
+  function buildSideJump() {
+    sideJumpEls = [];
+    function fill(box, group) {
+      box.textContent = '';
+      SCENES.forEach(function (sc, i) {
+        if (sc.group !== group) return;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = sc.btn + '　' + sc.title;
+        b.setAttribute('data-idx', String(i));
+        b.addEventListener('click', function () {
+          filter = group;
+          applyFilter(group);
+          applyScene(i);
+        });
+        box.appendChild(b);
+        sideJumpEls.push(b);
+      });
+    }
+    fill(sideAlert, 'alert');
+    fill(sideWeather, 'weather');
+    fill(sideOther, 'other');
+  }
+
+  function buildButtons() {
+    var lastGroup = '';
+    buttonEls = [];
+    controls.textContent = '';
+    SCENES.forEach(function (sc, i) {
+      if (sc.groupLabel && sc.group !== lastGroup) {
+        var lab = document.createElement('div');
+        lab.className = 'ctrl-group';
+        lab.textContent = sc.groupLabel;
+        lab.setAttribute('data-group', sc.group);
+        controls.appendChild(lab);
+        lastGroup = sc.group;
+      } else if (sc.group && sc.group !== lastGroup) {
+        lastGroup = sc.group;
+      }
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = sc.btn;
+      b.setAttribute('data-idx', String(i));
+      b.setAttribute('data-group', sc.group || '');
+      b.addEventListener('click', function () {
+        applyScene(i);
+      });
+      controls.appendChild(b);
+      buttonEls.push(b);
+    });
+  }
+
+  filterTabs.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.getAttribute('data-filter')) return;
+    applyFilter(t.getAttribute('data-filter'));
+  });
+
+  function startCountdown() {
+    if (tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(function () {
+      if (!autoPlayEl.checked) {
+        countdownEl.textContent = '停止中';
+        return;
+      }
+      secLeft -= 1;
+      if (secLeft <= 0) {
+        nextScene();
+      } else {
+        countdownEl.textContent = String(secLeft);
+      }
+    }, 1000);
+  }
+
+  buildButtons();
+  buildSideJump();
+  applyFilter('all');
+  applyScene(0);
+  stepAnim();
+  startCountdown();
+})();
+</script>
+</body>
+</html>

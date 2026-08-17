@@ -1,0 +1,359 @@
+[
+  {
+    "as_of": "2026-08-12",
+    "source": "https://www.jma.go.jp/jma/kishou/know/bosai/keiho-update2026/",
+    "note": "令和8年5月29日運用開始の新たな防災気象情報に準拠。情報名はレベル数字付き。"
+  },
+  {
+    "category": "大雨浸水",
+    "type": "早期注意情報",
+    "level": 1,
+    "evacuation_info": null,
+    "official_name": "レベル1早期注意情報",
+    "description": "警報級の可能性が高い（中）または中程度（低）のときに発表。災害への心構えを高める段階。"
+  },
+  {
+    "category": "大雨浸水",
+    "type": "注意報",
+    "level": 2,
+    "evacuation_info": null,
+    "official_name": "レベル2大雨注意報",
+    "description": "大雨による浸水害等が発生するおそれがあると予想したときに発表。"
+  },
+  {
+    "category": "大雨浸水",
+    "type": "警報",
+    "level": 3,
+    "evacuation_info": "高齢者等避難",
+    "official_name": "レベル3大雨警報",
+    "description": "大雨による重大な浸水害が発生するおそれが大きいと予想したときに発表。高齢者等は避難を開始する目安。"
+  },
+  {
+    "category": "大雨浸水",
+    "type": "危険警報",
+    "level": 4,
+    "evacuation_info": "避難指示",
+    "official_name": "レベル4大雨危険警報",
+    "description": "大雨による重大な浸水害が切迫しているときに発表。危険な場所から全員避難の目安。"
+  },
+  {
+    "category": "大雨浸水",
+    "type": "特別警報",
+    "level": 5,
+    "evacuation_info": "緊急安全確保",
+    "official_name": "レベル5大雨特別警報",
+    "description": "重大な災害の危険性が著しく高まっているときに発表。すでに災害が発生・切迫している状況。"
+  },
+  {
+    "category": "土砂災害",
+    "type": "早期注意情報",
+    "level": 1,
+    "evacuation_info": null,
+    "official_name": "レベル1早期注意情報",
+    "description": "警報級の可能性が高い（中）または中程度（低）のときに発表。災害への心構えを高める段階。"
+  },
+  {
+    "category": "土砂災害",
+    "type": "注意報",
+    "level": 2,
+    "evacuation_info": null,
+    "official_name": "レベル2土砂災害注意報",
+    "description": "土砂災害が発生するおそれがあると予想したときに発表（土砂災害単体の注意報として運用）。"
+  },
+  {
+    "category": "土砂災害",
+    "type": "警報",
+    "level": 3,
+    "evacuation_info": "高齢者等避難",
+    "official_name": "レベル3土砂災害警報",
+    "description": "土砂災害による重大な災害が発生するおそれが大きいと予想したときに発表。高齢者等は避難を開始する目安。"
+  },
+  {
+    "category": "土砂災害",
+    "type": "危険警報",
+    "level": 4,
+    "evacuation_info": "避難指示",
+    "official_name": "レベル4土砂災害危険警報",
+    "description": "旧・土砂災害警戒情報に相当。命に危険が及ぶ土砂災害が切迫。危険な場所から全員避難の目安。"
+  },
+  {
+    "category": "土砂災害",
+    "type": "特別警報",
+    "level": 5,
+    "evacuation_info": "緊急安全確保",
+    "official_name": "レベル5土砂災害特別警報",
+    "description": "土砂災害の危険性が著しく高まっているときに発表。すでに災害が発生・切迫している状況。"
+  },
+  {
+    "category": "河川氾濫",
+    "type": "早期注意情報",
+    "level": 1,
+    "evacuation_info": null,
+    "official_name": "レベル1早期注意情報",
+    "description": "警報級の可能性が高い（中）または中程度（低）のときに発表。災害への心構えを高める段階。"
+  },
+  {
+    "category": "河川氾濫",
+    "type": "注意報",
+    "level": 2,
+    "evacuation_info": null,
+    "official_name": "レベル2氾濫注意報",
+    "description": "指定河川等で氾濫のおそれがあるときに発表。"
+  },
+  {
+    "category": "河川氾濫",
+    "type": "警報",
+    "level": 3,
+    "evacuation_info": "高齢者等避難",
+    "official_name": "レベル3氾濫警報",
+    "description": "氾濫による重大な災害のおそれが大きいときに発表。高齢者等は避難を開始する目安。"
+  },
+  {
+    "category": "河川氾濫",
+    "type": "危険警報",
+    "level": 4,
+    "evacuation_info": "避難指示",
+    "official_name": "レベル4氾濫危険警報",
+    "description": "氾濫による重大な災害が切迫。危険な場所から全員避難の目安。"
+  },
+  {
+    "category": "河川氾濫",
+    "type": "特別警報",
+    "level": 5,
+    "evacuation_info": "緊急安全確保",
+    "official_name": "レベル5氾濫特別警報",
+    "description": "令和8年から新設。氾濫が差し迫ったときに河川ごとに発表。命の危険が迫る状況。"
+  },
+  {
+    "category": "高潮",
+    "type": "早期注意情報",
+    "level": 1,
+    "evacuation_info": null,
+    "official_name": "レベル1早期注意情報",
+    "description": "警報級の可能性が高い（中）または中程度（低）のときに発表。災害への心構えを高める段階。"
+  },
+  {
+    "category": "高潮",
+    "type": "注意報",
+    "level": 2,
+    "evacuation_info": null,
+    "official_name": "レベル2高潮注意報",
+    "description": "高潮により災害が発生するおそれがあると予想したときに発表。"
+  },
+  {
+    "category": "高潮",
+    "type": "警報",
+    "level": 3,
+    "evacuation_info": "高齢者等避難",
+    "official_name": "レベル3高潮警報",
+    "description": "高潮により重大な災害が発生するおそれが大きいと予想したときに発表。高齢者等は避難を開始する目安。"
+  },
+  {
+    "category": "高潮",
+    "type": "危険警報",
+    "level": 4,
+    "evacuation_info": "避難指示",
+    "official_name": "レベル4高潮危険警報",
+    "description": "高潮による重大な災害が切迫。危険な場所から全員避難の目安（警報と特別警報のレベル対応を整理）。"
+  },
+  {
+    "category": "高潮",
+    "type": "特別警報",
+    "level": 5,
+    "evacuation_info": "緊急安全確保",
+    "official_name": "レベル5高潮特別警報",
+    "description": "高潮の危険性が著しく高まっているときに発表。すでに災害が発生・切迫している状況。"
+  },
+  {
+    "category": "暴風",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "強風注意報",
+    "description": "強風により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "暴風",
+    "type": "警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "暴風警報",
+    "description": "暴風により重大な災害が発生するおそれが大きいと予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "暴風",
+    "type": "特別警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "暴風特別警報",
+    "description": "数十年に一度の強度の台風等により暴風が吹くと予想される場合などに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "暴風雪",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "風雪注意報",
+    "description": "雪を伴う強風により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "暴風雪",
+    "type": "警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "暴風雪警報",
+    "description": "雪を伴う暴風により重大な災害が発生するおそれが大きいと予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "暴風雪",
+    "type": "特別警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "暴風雪特別警報",
+    "description": "数十年に一度の強度により雪を伴う暴風が吹くと予想される場合などに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "大雪",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "大雪注意報",
+    "description": "大雪により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "大雪",
+    "type": "警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "大雪警報",
+    "description": "大雪により重大な災害が発生するおそれが大きいと予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "大雪",
+    "type": "特別警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "大雪特別警報",
+    "description": "数十年に一度の降雪量となる大雪が予想される場合などに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "波浪",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "波浪注意報",
+    "description": "高い波により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "波浪",
+    "type": "警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "波浪警報",
+    "description": "高い波により重大な災害が発生するおそれが大きいと予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "波浪",
+    "type": "特別警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "波浪特別警報",
+    "description": "数十年に一度の強度の台風等により高波になると予想される場合などに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "雷",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "雷注意報",
+    "description": "落雷等により被害が予想されるときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "濃霧",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "濃霧注意報",
+    "description": "濃い霧により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "乾燥",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "乾燥注意報",
+    "description": "空気の乾燥により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "なだれ",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "なだれ注意報",
+    "description": "なだれにより災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "着氷",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "着氷注意報",
+    "description": "著しい着氷により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "着雪",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "着雪注意報",
+    "description": "著しい着雪により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "融雪",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "融雪注意報",
+    "description": "融雪により災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "霜",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "霜注意報",
+    "description": "早霜や晚霜により農作物の災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "低温",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "低温注意報",
+    "description": "低温により農作物や水道管の凍結などの災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "津波",
+    "type": "注意報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "津波注意報",
+    "description": "津波による災害が発生するおそれがあると予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "津波",
+    "type": "警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "津波警報",
+    "description": "津波による重大な災害が発生するおそれが大きいと予想したときに発表。警戒レベル対象外。"
+  },
+  {
+    "category": "津波",
+    "type": "特別警報",
+    "level": null,
+    "evacuation_info": null,
+    "official_name": "大津波警報",
+    "description": "高い津波が予想されるなど重大な災害の危険性が著しく高まっているときに発表（特別警報に位置付け）。警戒レベル対象外。"
+  }
+]

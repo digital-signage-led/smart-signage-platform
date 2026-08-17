@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>防災コンテンツ確認 — 久米島</title>
+  <style>
+    body { font-family: "Segoe UI", "Hiragino Sans", Meiryo, sans-serif; margin: 24px; background: #111; color: #f2f2f2; }
+    h1 { font-size: 1.4rem; margin: 0 0 8px; }
+    h2 { font-size: 1.05rem; margin: 28px 0 10px; color: #ffe34d; }
+    p { color: #aaa; margin: 0 0 20px; }
+    .grid { display: grid; gap: 12px; max-width: 560px; }
+    a {
+      display: block; padding: 16px 18px; border-radius: 10px; text-decoration: none;
+      color: #fff; font-weight: 700; font-size: 1.05rem;
+    }
+    a.led { background: #1a3a6b; }
+    a.catalog { background: #2a2610; border: 1px solid #886; }
+    a.warn { background: #b00000; }
+    a.eew { background: #8b0000; }
+    a.info { background: #1a3a6b; }
+    a.loop { background: #333; border: 1px solid #666; }
+    a.obs { background: #2a1a10; border: 1px solid #666; }
+    a.rain { background: #C82400; }
+    a.heat { background: #70006A; }
+    a.evac { background: #AB00AA; }
+    a.prod { background: #222; border: 1px solid #555; }
+    a small { display: block; font-weight: 500; opacity: 0.85; margin-top: 4px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>防災コンテンツ確認 — 久米島</h1>
+  <p>本番は天気予報を常時表示し、防災は発表時に割り込みます。</p>
+
+  <h2>テロップ（個別コンテンツ）</h2>
+  <div class="grid">
+    <a class="catalog" href="./wbgt-cube-okinawa-kumejima-demo-bousai.html">
+      個別コンテンツ切替（demo-bousai）
+      <small>大阪版と同じUI／1件ずつボタン選択・自動切替</small>
+    </a>
+    <a class="led" href="./led.html">
+      単体LED（発表中のみ・自動切替）
+      <small>512×128／発表分だけを1件ずつ</small>
+    </a>
+    <a class="catalog" href="./led.html?panel=1&amp;catalog=1">
+      全種別カタログ（led）
+      <small>見た目確認用</small>
+    </a>
+  </div>
+
+  <h2>本番4面（気象＋防災）</h2>
+  <div class="grid">
+    <a class="prod" href="./wbgt-cube-okinawa-kumejima-4face.html?native640=1">
+      本番4面（天気予報＋防災割り込み）
+      <small>気象庁・環境省／発表時のみ警報など</small>
+    </a>
+    <a class="loop" href="./wbgt-cube-okinawa-kumejima-4face.html?bosaiOnly=1&amp;native640=1">
+      防災のみモード
+      <small>?bosaiOnly=1／未発表は黒画面</small>
+    </a>
+    <a class="rain" href="./wbgt-cube-okinawa-kumejima-4face.html?demo=rainwarn&amp;native640=1">
+      警報テロップ確認（1件ずつ）
+      <small>黄・警戒レベル2・土砂災害注意報など／まとめは ?rainwhite=1</small>
+    </a>
+    <a class="catalog" href="./led.html?panel=1&amp;catalog=1#landslide-adv">
+      L2 土砂災害注意報（led）
+      <small>スクショ同型の黄テロップ確認</small>
+    </a>
+    <a class="heat" href="./wbgt-cube-okinawa-kumejima-4face.html?demo=alert&amp;native640=1">
+      熱中症アラート確認
+      <small>警戒／特別警戒</small>
+    </a>
+    <a class="evac" href="./wbgt-cube-okinawa-kumejima-4face.html?evac=all&amp;native640=1">
+      避難情報確認（L3〜5）
+      <small>高齢者等避難→避難指示→緊急安全確保</small>
+    </a>
+  </div>
+
+  <h2>地震</h2>
+  <p style="margin-top:-8px">直後1分＝黒ティッカー／その後＝観測パネル（防災ループに3周）</p>
+  <div class="grid">
+    <a class="warn" href="./wbgt-cube-okinawa-kumejima-4face.html?only=quake&amp;quake=warn&amp;native640=1">
+      ① 直後1分・黒ティッカー（警報）
+      <small>赤帯＋黄アイコン＋「〜で地震発生」大文字</small>
+    </a>
+    <a class="eew" href="./wbgt-cube-okinawa-kumejima-4face.html?only=quake&amp;quake=eew&amp;native640=1">
+      ② 直後1分・黒ティッカー（予報）
+      <small>同上・予報確認</small>
+    </a>
+    <a class="obs" href="./wbgt-cube-okinawa-kumejima-4face.html?quake=warn&amp;native640=1">
+      ③ 防災ループ＋割り込み
+      <small>1分黒 → 観測パネル3周</small>
+    </a>
+    <a class="info" href="./wbgt-cube-okinawa-kumejima-4face.html?only=quake&amp;quake=info&amp;native640=1">
+      ④ 地震情報
+      <small>情報種別の表示確認</small>
+    </a>
+  </div>
+</body>
+</html>
