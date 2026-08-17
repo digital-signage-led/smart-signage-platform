@@ -3,7 +3,12 @@
 本番 HTML が参照するロゴ・下帯をここに配置します。
 
 **会社ロゴ（案件ごとではなく会社単位）**
-- ファイル名は一意に（例: `sasakikensetu_logo.png` / `greencross_logo.png`）
+- ファイル名は一意に（例: `sasakikensetu_logo.png` / `morishita_foot.svg`）
+- 4面下帯: `会社名_foot`　／　5面右列: `会社名_logo`
+
+**森下組（4面・田原本など）**
+- `morishita_foot.png` — 時刻下帯バナー（Cube4面）
+- `morishita_logo.png` — 5面右列マーク
 - 制作アプリの「会社マスタ」で社名 ↔ ロゴファイル名を紐づけます
 - 案件フォルダに HTML を複製しない。エンジン HTML は共有、差し替えは地点・ロゴキー・コンテンツのみ
 

@@ -8,6 +8,7 @@ import { Button, Segmented, Toggle } from '../components/ui';
 import { displaySpecForSignage, signageKindMeta, SIGNAGE_KINDS, signageFacesLabel } from '../core/layoutRegistry';
 import { CONTROLLERS } from '../core/controllerRegistry';
 import type { ProjectForm } from '../types';
+import { compressLogoFile } from '../lib/signageLogo';
 
 const OPT_DEFS = [
   ['rain_warn', L.opt.rain_warn, 3000, L.optDesc.rain_warn],
@@ -27,7 +28,7 @@ const OPT_DEFS = [
 export function FormPage() {
   const {
     formMode, form, errors, logo, setLogo, setFormField, toggleFormOpt, validateAndSave,
-    backToList, backToStudio, openScene, formProject, companies, applyCompanyToForm,
+    backToList, backToStudio, openScene, formProject, companies, applyCompanyToForm, askDeleteProject,
   } = useApp();
   const accent = tokens.accent;
   const fileRef = useRef<HTMLInputElement>(null);
@@ -36,9 +37,14 @@ export function FormPage() {
 
   const readLogo = (file: File | undefined) => {
     if (!file) return;
-    const r = new FileReader();
-    r.onload = () => setLogo({ name: file.name, url: r.result as string });
-    r.readAsDataURL(file);
+    void compressLogoFile(file).then(
+      (url) => setLogo({ name: file.name, url }),
+      () => {
+        const r = new FileReader();
+        r.onload = () => setLogo({ name: file.name, url: r.result as string });
+        r.readAsDataURL(file);
+      },
+    );
   };
 
   const field = (k: keyof ProjectForm, label: string, required?: boolean) => (
@@ -113,6 +119,19 @@ export function FormPage() {
                 </select>
               </div>
               {field('company', L.form.company, true)}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: tokens.text.tertiary, marginBottom: 9 }}>{L.form.corpTitle}</label>
+                <Segmented
+                  options={[
+                    { value: 'prefix', label: L.form.corpPrefix },
+                    { value: 'suffix', label: L.form.corpSuffix },
+                    { value: 'none', label: L.form.corpNone },
+                  ]}
+                  value={form.corpTitlePos}
+                  onChange={(v) => setFormField('corpTitlePos', v as typeof form.corpTitlePos)}
+                />
+                <div style={{ fontSize: 12, color: tokens.text.faint, marginTop: 8 }}>{L.form.corpTitleHint}</div>
+              </div>
               {field('site', L.form.site, true)}
               <div>
                 <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: tokens.text.tertiary, marginBottom: 7 }}>{L.form.prefecture}</label>
@@ -302,9 +321,14 @@ export function FormPage() {
           </Section>
         </div>
       </div>
-      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 40px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <Button variant="secondary" onClick={() => (formMode === 'edit' ? backToList() : backToStudio())}>{L.common.cancel}</Button>
-        <Button onClick={validateAndSave}>{formMode === 'edit' ? L.form.saveEdit : L.form.saveNew}</Button>
+      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '16px 40px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        {formMode === 'edit' && formProject ? (
+          <Button variant="danger" onClick={() => askDeleteProject(formProject)}>{L.list.delete}</Button>
+        ) : <span />}
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Button variant="secondary" onClick={() => (formMode === 'edit' ? backToList() : backToStudio())}>{L.common.cancel}</Button>
+          <Button onClick={validateAndSave}>{formMode === 'edit' ? L.form.saveEdit : L.form.saveNew}</Button>
+        </div>
       </div>
     </main>
   );

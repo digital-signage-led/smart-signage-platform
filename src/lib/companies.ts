@@ -26,6 +26,10 @@ export function listingOf(p: Project): ProjectListing {
   return p.listing === 'demo' ? 'demo' : 'paid';
 }
 
+export function companyNameKey(name: string): string {
+  return String(name || '').replace(/株式会社/g, '').replace(/\s+/g, '').trim();
+}
+
 export function companyIdFromName(name: string): string {
   const base = name
     .trim()
@@ -66,15 +70,19 @@ export function deriveCompaniesFromProjects(projects: Project[], existing: Compa
 /** 案件に会社ID・ライフサイクル・ロゴキーを補完 */
 export function enrichProjectRegistry(p: Project, companies: Company[]): Project {
   const lifecycle = lifecycleOf(p);
+  const nameKey = companyNameKey(p.company);
   const matched =
     (p.companyId && companies.find((c) => c.id === p.companyId)) ||
-    companies.find((c) => c.name === p.company);
+    companies.find((c) => c.name === p.company) ||
+    companies.find((c) => companyNameKey(c.name) === nameKey);
   const companyId = p.companyId || matched?.id || companyIdFromName(p.company);
   const co = companies.find((c) => c.id === companyId);
   const logoKey = p.logoKey || normalizeLogoKey(p.logoSrc) || co?.logoKey;
   const logoSrc = p.logoSrc || logoSrcFromKey(logoKey) || logoSrcFromKey(co?.logoKey);
-  const footBannerSrc =
-    p.footBannerSrc || logoSrcFromKey(co?.footBannerKey);
+  const keepKohjiBanner = /kohji/i.test(p.footBannerSrc || '') && /鴻治/.test(p.company);
+  const footBannerSrc = keepKohjiBanner
+    ? p.footBannerSrc
+    : logoSrcFromKey(co?.footBannerKey) || ( /kohji/i.test(p.footBannerSrc || '') ? undefined : p.footBannerSrc);
   return {
     ...p,
     lifecycle,
@@ -88,13 +96,14 @@ export function enrichProjectRegistry(p: Project, companies: Company[]): Project
 
 export function applyCompanyToProjectFields(
   company: Company | undefined,
-): Pick<Project, 'company' | 'companyId' | 'logoKey' | 'logoSrc' | 'footBannerSrc'> {
+): Pick<Project, 'company' | 'companyId' | 'corpTitlePos' | 'logoKey' | 'logoSrc' | 'footBannerSrc'> {
   if (!company) {
-    return { company: '', companyId: undefined, logoKey: undefined, logoSrc: undefined, footBannerSrc: undefined };
+    return { company: '', companyId: undefined, corpTitlePos: undefined, logoKey: undefined, logoSrc: undefined, footBannerSrc: undefined };
   }
   return {
     company: company.name,
     companyId: company.id,
+    corpTitlePos: company.corpTitlePos,
     logoKey: company.logoKey,
     logoSrc: logoSrcFromKey(company.logoKey),
     footBannerSrc: logoSrcFromKey(company.footBannerKey),

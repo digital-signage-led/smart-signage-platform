@@ -12,16 +12,8 @@
     <title>WBGT Signage 4面 - 庄原市（鴻治組）</title>
     <link rel="preload" as="image" href="./assets/kohji_logo.png">
     <script>
-/** 4面 512×128 本番用（layout512 + native640） */
+/** 4面 512×128 本番用。レイアウトは HTML 側で既定。URL に layout512 等を足さない */
 (function () {
-    var q = new URLSearchParams(location.search);
-    if (!q.has('layout512')) q.set('layout512', '1');
-    if (!q.has('native640')) q.set('native640', '1');
-    if (!q.has('embed')) q.set('embed', '1');
-    var qs = q.toString();
-    if (qs && location.search !== '?' + qs) {
-        history.replaceState(null, '', location.pathname + '?' + qs);
-    }
     document.documentElement.classList.add('native-640', 'layout-512');
     function addBody_() {
         if (document.body) document.body.classList.add('native-640', 'layout-512');
@@ -311,7 +303,8 @@
         }
         #scene1 .s1-wbgt-banner-slot .s1-wbgt-banner {
             display: block; margin: 0 auto;
-            height: 100%; width: auto; max-width: 100%;
+            height: 100%; width: auto;
+            max-width: 100%;
             object-fit: contain; object-position: center center;
             background: transparent;
             mix-blend-mode: normal;
@@ -2064,6 +2057,29 @@
 </script>
 <script>
     const query = new URLSearchParams(window.location.search);
+    const ASSET_REV = '20260817h';
+    const COMPANY_ALIAS = {
+        morishita: { customer: '株式会社森下組', banner: './assets/morishita_foot.png' },
+        kohji: { customer: '株式会社鴻治組', banner: './assets/kohji_logo.png' }
+    };
+    function qv_() {
+        for (var i = 0; i < arguments.length; i++) {
+            var v = (query.get(arguments[i]) || '').trim();
+            if (v) return v;
+        }
+        return '';
+    }
+    function withAssetRev_(src) {
+        var s = String(src || '').trim();
+        if (!s || s.indexOf('?') >= 0 || s.indexOf('data:') === 0) return s;
+        return s + '?v=' + ASSET_REV;
+    }
+    function resolveBannerPath_(raw) {
+        var s = String(raw || '').trim();
+        if (!s || s === '0' || s === 'none' || s === 'off') return s;
+        if (/^(\.\/|https?:|data:)/i.test(s)) return s;
+        return './assets/' + s.replace(/^assets\//, '');
+    }
     /* demo=1: デモモード（demo.html からの転送先）。未指定時は本番（実データ取得） */
     const demoParam = query.get('demo');
     const DEMO_SIGNAGE = demoParam === '1' || demoParam === 'all' || demoParam === 'full';
@@ -2072,6 +2088,72 @@
     const WBGT_ONLY = query.get('wbgtOnly') === '1';
     /** 大雨警報シーンは出さない（熱中症アラートは環境省発表時のみ） */
     const SITE_CFG = window.SignageConfig || {};
+    (function applyCustomerQuery_() {
+        const alias = COMPANY_ALIAS[(query.get('co') || '').trim().toLowerCase()] || null;
+        let customer = (query.get('customer') || '').trim() || (alias && alias.customer) || '';
+        const loc = (query.get('loc') || '').trim();
+        const logoId = (query.get('logoId') || '').trim();
+        let banner = resolveBannerPath_(query.get('footBanner') || query.get('banner') || '');
+        if (!banner && alias && alias.banner) banner = alias.banner;
+        if (!banner && /森下/.test(customer)) banner = COMPANY_ALIAS.morishita.banner;
+        if (banner && banner !== '0' && banner !== 'none' && banner !== 'off') banner = withAssetRev_(banner);
+        function readStoredLogo_(id, name) {
+            var hash = String(location.hash || '');
+            if (hash.indexOf('#logo=') === 0) {
+                try { return decodeURIComponent(hash.slice(6)); } catch (e0) {}
+            }
+            try {
+                var store = JSON.parse(localStorage.getItem('ssp_signage_logos_v1') || '{}');
+                if (id && store[id]) return store[id];
+                if (name && store[name]) return store[name];
+            } catch (e1) {}
+            try {
+                var boot = JSON.parse(localStorage.getItem('ssp_v1') || '{}');
+                var list = boot.projects || [];
+                var i, p, co;
+                for (i = 0; i < list.length; i++) {
+                    p = list[i];
+                    if (id && p && p.id === id && p.logoSrc) return p.logoSrc;
+                }
+                for (i = 0; i < list.length; i++) {
+                    p = list[i];
+                    if (!p || !p.logoSrc) continue;
+                    co = String(p.company || '');
+                    if (name && co && (name.indexOf(co) !== -1 || co.indexOf(name) !== -1)) return p.logoSrc;
+                }
+            } catch (e2) {}
+            return '';
+        }
+        var logo = (query.get('logo') || '').trim() || readStoredLogo_(logoId, customer);
+        SITE_CFG.site = SITE_CFG.site || {};
+        if (customer) {
+            SITE_CFG.site.customer = customer;
+            SITE_CFG.site.label = customer;
+            SITE_CFG.site.rental = '';
+        }
+        if (loc) {
+            SITE_CFG.site.locationLabel = loc;
+            if (SITE_CFG.jma) SITE_CFG.jma.forecastLabel = loc;
+        }
+        const sc = window.SIGNAGE_CONFIG || {};
+        if (banner === '0' || banner === 'none' || banner === 'off') {
+            sc.footBannerSrc = '';
+        } else if (banner) {
+            sc.footBannerSrc = banner;
+        } else if (customer && /kohji/i.test(String(sc.footBannerSrc || ''))) {
+            sc.footBannerSrc = '';
+        }
+        if (logo) {
+            sc.logoSrc = logo;
+            sc.footLogoSrc = logo;
+            if (customer) sc.logoAlt = customer;
+            if (!banner || banner === '0' || banner === 'none' || banner === 'off' || /kohji/i.test(String(sc.footBannerSrc || ''))) {
+                sc.footBannerSrc = logo;
+            }
+        }
+        window.SIGNAGE_CONFIG = sc;
+        window.SignageConfig = SITE_CFG;
+    })();
     const SITE_MSG_CFG = (SITE_CFG && SITE_CFG.message) || {};
     function resolveSiteMsgText_() {
         const q = (query.get('siteMsg') || '').trim();
@@ -2132,8 +2214,12 @@
             }
         } catch (_) {}
     }
-    /* ?loop=s1,s2,... または loop=none — ON のシーンだけ巡回（省略時は従来どおり全部） */
-    const LOOP_PARAM = (query.get('loop') || '').trim();
+    /* ?loop=s1,s2,... / loop=std（JMA 4面）/ loop=none。省略時は従来どおり全部 */
+    const LOOP_PARAM = (function () {
+        const raw = (query.get('loop') || '').trim();
+        if (raw === 'std' || raw === 'jma') return 's1,s3,s4,s5,message';
+        return raw;
+    })();
     const LOOP_RESTRICT = LOOP_PARAM !== '';
     const LOOP_SET = (function () {
         if (!LOOP_RESTRICT) return null;
@@ -2156,10 +2242,8 @@
         return true;
     }
 
-    const DEMO_EMBED = query.get('embed') === '1';  /* 確認ボード iframe 用（バッジ非表示） */
-    /* 640×128 ネイティブ: embed / native640=1 / フルデモ順送り */
-    const NATIVE_640 = query.get('native640') === '1' || DEMO_EMBED
-        || (DEMO_SIGNAGE && !DEMO_ONLY && query.get('native640') !== '0');
+    const DEMO_EMBED = query.get('embed') !== '0';  /* 未指定は本番LED（バッジ非表示）。embed=0 で確認バッジ */
+    const NATIVE_640 = query.get('native640') !== '0';
     if (NATIVE_640) {
         document.documentElement.classList.add('native-640', 'layout-512');
         document.body.classList.add('native-640', 'layout-512');
@@ -2278,7 +2362,7 @@
     const DEMO_LEVEL_ORDER = [0, 1, 2, 3, 4];
     const DEMO_WBGT_BY_LEVEL = [19.0, 22.0, 26.0, 29.0, 32.0];
     let demoLevelPointer = 0;
-    const MOE_WBGT_POINT = query.get('moePoint') || (SITE_CFG.moe && SITE_CFG.moe.point) || '67116';
+    const MOE_WBGT_POINT = qv_('moePoint', 'p') || (SITE_CFG.moe && SITE_CFG.moe.point) || '67116';
     const MOE_ALERT_AREA = query.get('alertArea') || (SITE_CFG.moe && SITE_CFG.moe.alertArea) || '広島県';
     const MOE_POINT_CFG = {
         prefKey: 'shobara',
@@ -2340,19 +2424,19 @@
         return base + sep + 'type=bundle';
     }
     const JMA_AMEDAS_POINT =
-        query.get('jmaPoint') || (SITE_CFG.jma && SITE_CFG.jma.amedasPoint) || '67116';
+        qv_('jmaPoint', 'moePoint', 'p') || (SITE_CFG.jma && SITE_CFG.jma.amedasPoint) || '67116';
     const JMA_AMEDAS_SUPPLEMENT_POINT =
         query.get('jmaSupplementPoint') || (SITE_CFG.jma && SITE_CFG.jma.amedasSupplementPoint) || '67437';
     const JMA_FORECAST_AREA_CODE =
-        query.get('jmaArea') || (SITE_CFG.jma && SITE_CFG.jma.forecastArea) || '340000';
+        qv_('jmaArea', 'a') || (SITE_CFG.jma && SITE_CFG.jma.forecastArea) || '340000';
     const JMA_FETCH_HEADERS = { cache: 'no-store' };
     /* 気象庁 高解像度降水ナウキャスト（雨雲レーダー）— https://www.jma.go.jp/bosai/nowc/ */
     const JMA_NOWC_TARGET_TIMES_URL = 'https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N2.json';
     const JMA_NOWC_TILE_URL = 'https://www.jma.go.jp/bosai/jmatile/data/nowc/{basetime}/none/{validtime}/surf/hrpns/{z}/{x}/{y}.png';
     const DEFAULT_GEO_LAT = (SITE_CFG.geo && SITE_CFG.geo.lat) || 35.0375;
     const DEFAULT_GEO_LON = (SITE_CFG.geo && SITE_CFG.geo.lon) || 133.1601;
-    const RAIN_ALERT_LAT = parseFloat(query.get('rainLat') || DEFAULT_GEO_LAT);
-    const RAIN_ALERT_LON = parseFloat(query.get('rainLon') || DEFAULT_GEO_LON);
+    const RAIN_ALERT_LAT = parseFloat(qv_('rainLat', 'lat') || DEFAULT_GEO_LAT);
+    const RAIN_ALERT_LON = parseFloat(qv_('rainLon', 'lon') || DEFAULT_GEO_LON);
     const RAIN_ALERT_ZOOM = 6;
     const RAIN_RAIN_PIXEL_ALPHA = 128;
     const RAIN_CENTER_RADIUS_PX = 28;
@@ -3148,7 +3232,7 @@
         };
     }
     const JMA_WARN_AREA = query.get('warnArea') || (SITE_CFG.jma && SITE_CFG.jma.warnArea) || '340000';   /* 広島県 */
-    const JMA_WARN_CITY = query.get('warnCity') || (SITE_CFG.jma && SITE_CFG.jma.warnCity) || '3421000';  /* 庄原市 */
+    const JMA_WARN_CITY = qv_('warnCity', 'w') || (SITE_CFG.jma && SITE_CFG.jma.warnCity) || '3421000';  /* 庄原市 */
     const JMA_WARN_CITY_LABELS = { '3421000': '庄原市', '340000': '広島県' };
     let rainWarnMeta = {
         cityName: JMA_WARN_CITY_LABELS[JMA_WARN_CITY] || MOE_POINT_CFG.pointName || '庄原市',
@@ -6249,7 +6333,7 @@
     function buildS1FootBannerSlotHtml_() {
         const bannerSrc = getS1FootBannerSrc_();
         if (!bannerSrc) return '';
-        return `<div class="s1-wbgt-slot s1-wbgt-slot-left s1-wbgt-site-slot s1-wbgt-banner-slot"><img class="s1-wbgt-banner" src="${escapeS1Html(bannerSrc)}" alt="鴻治組" decoding="async"></div>`;
+        return `<div class="s1-wbgt-slot s1-wbgt-slot-left s1-wbgt-site-slot s1-wbgt-banner-slot"><img class="s1-wbgt-banner" src="${escapeS1Html(bannerSrc)}" alt="${escapeS1Html((SITE_CFG.site && SITE_CFG.site.customer) || '')}" decoding="async"></div>`;
     }
     function buildS1FootWbgtSlotHtml_(msgText) {
         return `<div class="s1-wbgt-slot s1-wbgt-slot-right s1-wbgt-slot-wbgt s1-wbgt-msg-slot">${msgText ? buildS1WbgtMsgHtml(msgText) : ''}</div>`;

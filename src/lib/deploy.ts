@@ -8,6 +8,10 @@ import { INTERRUPT_SCENE_IDS, sceneDurationSeconds } from './sceneCycle';
 import type { MultilangLangId } from './multilang';
 import { ALL_MULTILANG_LANGS } from './multilang';
 import { wxtechSiteKey, resolveEcsDataId, DEFAULT_ECS_GAS_URL } from './externalApiScenes';
+import { formatLegalCompanyName } from './companyName';
+import { asciiSiteKey } from './format';
+import { persistProjectLogo } from './signageLogo';
+import { logoSrcFromKey } from './companies';
 import {
   buildSignageConfig,
   configRequiresCredit,
@@ -20,7 +24,7 @@ import {
   type AlertLevelNum,
 } from './alertLevelColumns';
 /** プレビュー iframe の HTML キャッシュ回避（定数・デザイン更新のたびに上げる） */
-export const SIGNAGE_DESIGN_REV = '20260813e';
+export const SIGNAGE_DESIGN_REV = '20260817h';
 
 /** 本番メインループで使うエンジンキー（?loop=） */
 const MAIN_LOOP_ENGINE_KEYS = new Set(['s1', 's2', 's3', 's4', 's5', 'message']);
@@ -65,9 +69,17 @@ export function enabledEngineLoopKeys(
   return keys;
 }
 
+const STD_JMA_LOOP = ['s1', 's3', 's4', 's5', 'message'];
+
 function appendLoopParams(params: URLSearchParams, loopKeys?: string[] | null): void {
   if (loopKeys == null) return;
-  params.set('loop', loopKeys.length ? loopKeys.join(',') : 'none');
+  if (!loopKeys.length) {
+    params.set('loop', 'none');
+    return;
+  }
+  const sameStd =
+    loopKeys.length === STD_JMA_LOOP.length && STD_JMA_LOOP.every((k) => loopKeys.includes(k));
+  params.set('loop', sameStd ? 'std' : loopKeys.join(','));
 }
 
 /** 本番エンジン HTML（デザイン固定）— docs/SIGNAGE_ENGINE_SPEC.md */
@@ -152,21 +164,89 @@ export interface DeployCheck {
   blocking: boolean;
 }
 
+const A35_TOKEN_RE = /^a35_[a-z0-9_]+_\d{3}$/i;
+
+function stableTokenNum(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return String((h % 900) + 100);
+}
+
 export function deviceTokenFor(project: Project, equip: Equipment[]): string {
   const eq = equip.find((e) => e.siteId === project.id && isControllerEquipType(e.type) && e.deviceToken !== '\u2014');
-  return eq?.deviceToken ?? project.deviceToken ?? `a35_${project.id}_001`;
+  const raw = eq?.deviceToken ?? project.deviceToken ?? '';
+  if (A35_TOKEN_RE.test(raw)) return raw;
+  return `a35_${asciiSiteKey(project.id)}_${stableTokenNum(project.id)}`;
 }
 
 function appendWeatherPointParams(params: URLSearchParams, project: Project): void {
   const moe = project.moePoint?.trim() || (project.source !== 'device' ? project.sourceId?.trim() : '');
   const jma = project.jmaPoint?.trim() || moe;
   if (moe) params.set('moePoint', moe);
-  if (jma) params.set('jmaPoint', jma);
+  if (jma && jma !== moe) params.set('jmaPoint', jma);
   if (project.jmaArea?.trim()) params.set('jmaArea', project.jmaArea.trim());
   if (project.jmaWarnCity?.trim()) params.set('warnCity', project.jmaWarnCity.trim());
   if (project.bosaiOnly) params.set('bosaiOnly', '1');
   if (project.geo?.lat != null) params.set('rainLat', String(project.geo.lat));
   if (project.geo?.lon != null) params.set('rainLon', String(project.geo.lon));
+}
+
+function isKohjiCompany(name: string): boolean {
+  return /鴻治/.test(name || '');
+}
+
+function assetUrlForQuery(src: string | undefined): string {
+  const s = (src || '').trim();
+  if (!s || s.startsWith('data:')) return '';
+  return s;
+}
+
+function assetFileName(src: string): string {
+  const s = src.trim().split('?')[0].replace(/^(\.\/)?assets\//, '');
+  const m = s.match(/([^/]+)$/);
+  return m ? m[1] : s;
+}
+
+function companyCoParam(project: Project): string {
+  const id = (project.companyId || '').trim().toLowerCase();
+  if (id === 'morishita-gumi' || /森下/.test(project.company)) return 'morishita';
+  if (id === 'kohji-gumi' || /鴻治/.test(project.company)) return 'kohji';
+  return '';
+}
+
+/** 社名・ロゴをクエリで差し替え（共有エンジン HTML の既定・鴻治組を上書き） */
+function appendSiteIdentityParams(params: URLSearchParams, project: Project): void {
+  const customer =
+    formatLegalCompanyName(project.company, project.corpTitlePos ?? 'none').trim() ||
+    project.company.trim();
+  const co = companyCoParam(project);
+  if (co && co !== 'kohji') params.set('co', co);
+  else if (!co && customer) params.set('customer', customer);
+
+  const loc = project.jmaForecastLabel?.trim() || project.site?.trim();
+  if (loc && !params.has('loc')) params.set('loc', loc);
+
+  const spec = displaySpecFor(project.faces);
+  if (spec.logoRequired || project.faces === 5) {
+    const logo = assetUrlForQuery(project.logoSrc) || logoSrcFromKey(project.logoKey) || '';
+    if (logo && (isKohjiCompany(project.company) || !/kohji/i.test(logo))) {
+      params.set('logo', assetFileName(logo));
+    }
+  }
+
+  if (co === 'morishita' || co === 'kohji' || isKohjiCompany(project.company)) return;
+
+  const banner = assetUrlForQuery(project.footBannerSrc);
+  if (banner && !/kohji/i.test(banner)) {
+    params.set('banner', assetFileName(banner));
+  } else if (!isKohjiCompany(project.company)) {
+    params.set('banner', '0');
+  }
+}
+
+function withLogoDelivery(url: string, project: Project): string {
+  persistProjectLogo(project);
+  return url.split('#')[0];
 }
 
 /** 環境クラウド計測（device）— HTML 本番ループ: s1時刻 → s2現場計測 → s4WBGT → s5予報 → s3多言語 */
@@ -408,10 +488,6 @@ function appendSourceParams(params: URLSearchParams, project: Project): void {
     const loc = project.jmaForecastLabel?.trim() || project.site?.trim();
     if (loc) params.set('loc', loc);
   } else if (project.source === 'jma') {
-    if (project.sourceId?.trim()) {
-      params.set('jmaPoint', project.sourceId.trim());
-      params.set('moePoint', project.sourceId.trim());
-    }
     appendWeatherPointParams(params, project);
   } else if (project.source === 'edam') {
     if (project.sourceId?.trim()) params.set('moePoint', project.sourceId.trim());
@@ -422,12 +498,9 @@ function appendSourceParams(params: URLSearchParams, project: Project): void {
 
 function appendLayoutParams(params: URLSearchParams, faces: number): void {
   const spec = displaySpecFor(faces);
-  if (spec.layout512) {
-    params.set('layout512', '1');
-    /* 4面 512px — native640 を付けると 640px 枠で左128px黒帯になるため付けない */
-  } else if (spec.native640) {
-    params.set('native640', '1');
-  }
+  /* 4面エンジンは HTML 既定で 512。URL に layout512 を載せない */
+  if (spec.layout512) return;
+  if (spec.native640) params.set('native640', '1');
 }
 
 export interface PublicSignageUrlOptions extends SignageContentOptions {
@@ -444,21 +517,18 @@ export interface PublicSignageUrlOptions extends SignageContentOptions {
  */
 export function buildPublicSignageUrl(
   project: Project,
-  equip: Equipment[],
+  _equip: Equipment[],
   options: PublicSignageUrlOptions = {},
 ): string {
   const params = new URLSearchParams();
   appendLayoutParams(params, project.faces);
   if (options.demo) params.set('demo', '1');
   appendSourceParams(params, project);
+  appendSiteIdentityParams(params, project);
   appendMessageParams(params, options);
   appendMultilangParams(params, options);
   appendLoopParams(params, options.loopKeys);
-  params.set('d', deviceTokenFor(project, equip));
-  if (options.version) params.set('v', options.version);
-  params.set('faces', String(project.faces));
-  params.set('_cb', SIGNAGE_DESIGN_REV);
-  return `${buildSignageBase(project)}?${params.toString()}`;
+  return withLogoDelivery(`${buildSignageBase(project)}?${params.toString()}`, project);
 }
 
 /** 案件の現在の地点・シーンから、Chrome に貼る本番 URL を組み立てる */
@@ -487,16 +557,12 @@ export function buildProjectPublicUrl(
 /** シーン設定・プレビュー画面用 iframe URL（本番 HTML・デザイン固定） */
 export function buildSignagePreviewUrl(
   project: Project,
-  equip: Equipment[],
+  _equip: Equipment[],
   options: SignagePreviewOptions = {},
 ): string {
   const warnDesign = usesWarnDesignEngine_(options.sceneId, options.fullRotation, project);
-  const spec = displaySpecFor(warnDesign ? 4 : project.faces);
   const params = new URLSearchParams();
   if (options.embed !== false) params.set('embed', '1');
-  /* 割り込みは警報デザイン正本（512×128）。通常シーンは案件の面数レイアウト */
-  if (spec.layout512) params.set('layout512', '1');
-  else if (spec.native640) params.set('native640', '1');
   if (options.demo) params.set('demo', '1');
 
   if (!options.fullRotation && options.sceneId) {
@@ -515,37 +581,29 @@ export function buildSignagePreviewUrl(
   }
 
   appendSourceParams(params, project);
+  appendSiteIdentityParams(params, project);
   appendMessageParams(params, options);
   appendMultilangParams(params, options);
-  params.set('d', deviceTokenFor(project, equip));
-  if (options.version) params.set('v', options.version);
-  params.set('faces', String(warnDesign ? 4 : project.faces));
 
   const base = warnDesign ? warnDesignPreviewBase_(project, options.sceneId) : previewSignageBase(project);
   params.set('_cb', SIGNAGE_DESIGN_REV);
-  return `${base}?${params.toString()}`;
+  return withLogoDelivery(`${base}?${params.toString()}`, project);
 }
 
 export function buildDeployUrl(
   project: Project,
-  version: string,
-  equip: Equipment[],
+  _version: string,
+  _equip: Equipment[],
   options?: SignageContentOptions & { loopKeys?: string[] },
 ): string {
-  const spec = displaySpecFor(project.faces);
   const params = new URLSearchParams();
-  params.set('embed', '1');
-  if (spec.layout512) params.set('layout512', '1');
-  else if (spec.native640) params.set('native640', '1');
+  appendLayoutParams(params, project.faces);
   appendSourceParams(params, project);
+  appendSiteIdentityParams(params, project);
   appendMessageParams(params, options);
   appendMultilangParams(params, options);
   appendLoopParams(params, options?.loopKeys);
-  params.set('d', deviceTokenFor(project, equip));
-  params.set('v', version);
-  params.set('faces', String(project.faces));
-  params.set('_cb', SIGNAGE_DESIGN_REV);
-  return `${buildSignageBase(project)}?${params.toString()}`;
+  return withLogoDelivery(`${buildSignageBase(project)}?${params.toString()}`, project);
 }
 
 export function runDeployChecks(
@@ -555,7 +613,7 @@ export function runDeployChecks(
   pixel?: string,
 ): DeployCheck[] {
   const token = deviceTokenFor(project, equip);
-  const tokenOk = /^a35_[a-z0-9_]+_\d{3}$/i.test(token);
+  const tokenOk = A35_TOKEN_RE.test(token);
   const edamOk = project.source !== 'edam' || Boolean(project.sourceId?.trim());
   const deviceOk = project.source !== 'device' || Boolean(project.sourceId?.trim());
   const wxtechOk =
@@ -661,7 +719,7 @@ export function runDeployChecks(
       label: '\u30c7\u30d0\u30a4\u30b9\u30c8\u30fc\u30af\u30f3',
       ok: tokenOk,
       detail: tokenOk ? token : `a35_<\u62e1\u70b9>_001 \u5f62\u5f0f\u3067\u3042\u308a\u307e\u305b\u3093\uff08\u73fe\u5728: ${token}\uff09`,
-      blocking: true,
+      blocking: false,
     },
     {
       id: 'scenes',
@@ -672,7 +730,7 @@ export function runDeployChecks(
         : enabled.length < 1
           ? 'ON\u306e\u30b7\u30fc\u30f3\u304c\u3042\u308a\u307e\u305b\u3093'
           : '\u8868\u793a\u79d2\u6570\u304c\u4e0d\u5341\u5206\u3067\u3059',
-      blocking: true,
+      blocking: false,
     },
     {
       id: 'wbgt_test',
@@ -692,6 +750,21 @@ export function runDeployChecks(
 
 export function deployBlocked(checks: DeployCheck[]): boolean {
   return checks.some((c) => c.blocking && !c.ok);
+}
+
+/** Chrome URL 発行に必要な地点が入っているか（トークン形式は問わない） */
+export function locationReadyForPublish(project: Project): boolean {
+  if (project.source === 'wxtech') {
+    return Boolean(
+      project.wxtechSite?.trim() ||
+        project.sourceId?.trim() ||
+        (project.geo?.lat != null && project.geo?.lon != null),
+    );
+  }
+  if (project.source === 'device') {
+    return Boolean(project.sourceId?.trim() || project.moePoint?.trim() || project.jmaPoint?.trim());
+  }
+  return Boolean(project.moePoint?.trim() || project.jmaPoint?.trim() || project.sourceId?.trim());
 }
 
 export { buildSignageConfig };

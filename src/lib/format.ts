@@ -13,11 +13,21 @@ export function fmtElapsed(sec: number | null) {
   return `${h}時間${m % 60}分前`;
 }
 
+/** トークン用の ASCII キー（日本語の案件IDだと a35_田原本_001 になり発行チェックで落ちる） */
+export function asciiSiteKey(raw: string): string {
+  const ascii = String(raw || '').replace(/[^a-z0-9_]/gi, '').toLowerCase();
+  if (ascii.length >= 2) return ascii.slice(0, 16);
+  let h = 2166136261;
+  const s = String(raw || 'site');
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return `p${(h >>> 0).toString(36).slice(0, 8)}`;
+}
+
 export function genToken(type: string, siteId: string) {
   if (!siteId) return '\u2014';
   const prefix = ({ a35: 'a35', led: 'led', other: 'dev' })[type] ?? 'dev';
   const n = String(Math.floor(Math.random() * 900) + 100);
-  return `${prefix}_${siteId}_${n}`;
+  return `${prefix}_${asciiSiteKey(siteId)}_${n}`;
 }
 
 export function slugId(company: string, site: string) {

@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { tokens } from '../tokens';
 import { useApp } from '../context/AppContext';
 import { L } from '../i18n/labels';
 import { PREFECTURES } from '../data/mock';
-import { SITE_TEMPLATE_LIST, type SiteTemplateId } from '../data/projectTemplates';
+import { SITE_TEMPLATE_LIST, SITE_TEMPLATES, type SiteTemplateId } from '../data/projectTemplates';
 import { detectLocationIdKind } from '../lib/siteAutoSetup';
 import { testWbgtPoint, type WbgtTestResult } from '../lib/wbgtTest';
 import { buildSignageRuntimeConfig, runtimeConfigSummaryRows } from '../lib/signageRuntimeConfig';
@@ -11,7 +11,10 @@ import { buildPublicSignageUrl, enabledEngineLoopKeys } from '../lib/deploy';
 import { SignagePreviewFrame } from '../components/SignagePreviewFrame';
 import { Button, Segmented } from '../components/ui';
 import { inputStyle, selectStyle } from '../lib/meta';
-import type { Project } from '../types';
+import { formatLegalCompanyName } from '../lib/companyName';
+import { logoSrcFromKey } from '../lib/companies';
+import { compressLogoFile } from '../lib/signageLogo';
+import type { CorpTitlePos, Project } from '../types';
 
 export function QuickSetupPage() {
   const {
@@ -20,10 +23,11 @@ export function QuickSetupPage() {
 
   const [wbgtTest, setWbgtTest] = useState<WbgtTestResult | null>(null);
   const [testing, setTesting] = useState(false);
+  const logoRef = useRef<HTMLInputElement>(null);
 
   const kind = detectLocationIdKind(quickInput.locationId);
   const isEcsTpl = quickInput.templateId === 'face4_ecs';
-  const pointForTest = kind === 'amedas' ? quickInput.locationId : '';
+  const pointForTest = /^\d{5}$/.test(quickInput.locationId.trim()) ? quickInput.locationId.trim() : '';
 
   const previewProject = useMemo((): Project | null => {
     if (!autoPreview || !quickInput.company.trim() || !quickInput.site.trim()) return null;
@@ -47,7 +51,6 @@ export function QuickSetupPage() {
     if (!previewProject) return '';
     const scenes = autoPreview?.sceneConfig?.scenes;
     return buildPublicSignageUrl(previewProject, [], {
-      version: 'v2.1',
       loopKeys: scenes ? enabledEngineLoopKeys(scenes, previewProject) : undefined,
     });
   }, [previewProject, autoPreview]);
@@ -71,42 +74,6 @@ export function QuickSetupPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(280px,360px)', gap: 24, alignItems: 'start' }}>
         <div>
           <section style={{ background: tokens.bg.s1, borderRadius: 16, padding: 22, marginBottom: 18, border: '1px solid rgba(255,255,255,0.07)' }}>
-            <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>{L.quick.secTemplate}</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {SITE_TEMPLATE_LIST.map((t) => (
-                <label
-                  key={t.id}
-                  style={{
-                    display: 'flex',
-                    gap: 12,
-                    padding: 14,
-                    borderRadius: 12,
-                    cursor: 'pointer',
-                    border: `1px solid ${quickInput.templateId === t.id ? tokens.accent : 'rgba(255,255,255,0.08)'}`,
-                    background: quickInput.templateId === t.id ? `${tokens.accent}14` : tokens.bg.s2,
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="tpl"
-                    checked={quickInput.templateId === t.id}
-                    onChange={() => setQuickField('templateId', t.id as SiteTemplateId)}
-                    style={{ marginTop: 4 }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
-                    <div style={{ fontSize: 12, color: tokens.text.faint, marginTop: 4 }}>{t.description}</div>
-                    <div style={{ fontSize: 11, color: tokens.text.faint, marginTop: 6, fontFamily: 'ui-monospace, monospace' }}>
-                      {t.engineFile}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#FFE34D', marginTop: 4 }}>{t.designNote}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section style={{ background: tokens.bg.s1, borderRadius: 16, padding: 22, marginBottom: 18, border: '1px solid rgba(255,255,255,0.07)' }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>{L.quick.secSite}</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <Field label={L.form.companyPick}>
@@ -120,7 +87,15 @@ export function QuickSetupPage() {
                     }
                     const co = companies.find((c) => c.id === id);
                     setQuickField('companyId', id);
-                    if (co) setQuickField('company', co.name);
+                    if (co) {
+                      setQuickField('company', co.name);
+                      if (co.corpTitlePos) setQuickField('corpTitlePos', co.corpTitlePos);
+                      const src = logoSrcFromKey(co.logoKey);
+                      if (src) {
+                        setQuickField('logoSrc', src);
+                        setQuickField('logoName', co.logoKey);
+                      }
+                    }
                   }}
                   style={selectStyle}
                 >
@@ -136,6 +111,23 @@ export function QuickSetupPage() {
                   setQuickField('companyId', '');
                 }} style={inputStyle(false)} />
               </Field>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Field label={L.form.corpTitle}>
+                  <Segmented
+                    options={[
+                      { value: 'prefix', label: L.form.corpPrefix },
+                      { value: 'suffix', label: L.form.corpSuffix },
+                      { value: 'none', label: L.form.corpNone },
+                    ]}
+                    value={quickInput.corpTitlePos ?? 'none'}
+                    onChange={(v) => setQuickField('corpTitlePos', v as CorpTitlePos)}
+                  />
+                  <div style={{ fontSize: 12, color: tokens.text.faint, marginTop: 8 }}>
+                    {L.form.corpTitleHint}
+                    {quickInput.company.trim() ? `　→ ${formatLegalCompanyName(quickInput.company, quickInput.corpTitlePos ?? 'none')}` : ''}
+                  </div>
+                </Field>
+              </div>
               <Field label={L.form.site} required>
                 <input value={quickInput.site} onChange={(e) => setQuickField('site', e.target.value)} style={inputStyle(false)} />
               </Field>
@@ -160,6 +152,86 @@ export function QuickSetupPage() {
               <div style={{ gridColumn: '1 / -1' }}>
                 <Field label={L.form.siteAddress}>
                   <input value={quickInput.siteAddress} onChange={(e) => setQuickField('siteAddress', e.target.value)} style={inputStyle(false)} placeholder="〒…" />
+                </Field>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Field label={L.form.logo} required={SITE_TEMPLATES[quickInput.templateId].faces === 5}>
+                  <div
+                    onClick={() => logoRef.current?.click()}
+                    style={{
+                      minHeight: 88,
+                      border: '1.5px dashed rgba(255,255,255,0.16)',
+                      borderRadius: 13,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      background: tokens.bg.s2,
+                      flexDirection: 'column',
+                      gap: 8,
+                      padding: 12,
+                    }}
+                  >
+                    {quickInput.logoSrc ? (
+                      <>
+                        <img src={quickInput.logoSrc} alt="" style={{ maxHeight: 48, maxWidth: 180, objectFit: 'contain' }} />
+                        <span style={{ fontSize: 12, color: tokens.text.muted }}>{quickInput.logoName || L.form.logoPick}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 13, color: tokens.text.muted }}>{L.form.logoPick}</span>
+                        {SITE_TEMPLATES[quickInput.templateId].faces === 5 ? (
+                          <span style={{ fontSize: 11.5, color: tokens.status.down }}>{L.form.logoRequired5}</span>
+                        ) : null}
+                      </>
+                    )}
+                    <input
+                      ref={logoRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        void compressLogoFile(file).then(
+                          (src) => {
+                            setQuickField('logoSrc', src);
+                            setQuickField('logoName', file.name);
+                          },
+                          () => {
+                            const r = new FileReader();
+                            r.onload = () => {
+                              setQuickField('logoSrc', String(r.result || ''));
+                              setQuickField('logoName', file.name);
+                            };
+                            r.readAsDataURL(file);
+                          },
+                        );
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8 }}>
+                    <span style={{ fontSize: 12, color: tokens.text.faint }}>{L.form.logoHint}</span>
+                    {quickInput.logoSrc ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickField('logoSrc', '');
+                          setQuickField('logoName', '');
+                        }}
+                        style={{
+                          all: 'unset',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          color: tokens.text.muted,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {L.form.logoClear}
+                      </button>
+                    ) : null}
+                  </div>
                 </Field>
               </div>
             </div>
@@ -205,6 +277,43 @@ export function QuickSetupPage() {
                   {wbgtTest.message}
                 </span>
               )}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: tokens.text.faint }}>{L.quick.wbgtTestHint}</div>
+          </section>
+
+          <section style={{ background: tokens.bg.s1, borderRadius: 16, padding: 22, marginBottom: 18, border: '1px solid rgba(255,255,255,0.07)' }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>{L.quick.secTemplate}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {SITE_TEMPLATE_LIST.map((t) => (
+                <label
+                  key={t.id}
+                  style={{
+                    display: 'flex',
+                    gap: 12,
+                    padding: 14,
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    border: `1px solid ${quickInput.templateId === t.id ? tokens.accent : 'rgba(255,255,255,0.08)'}`,
+                    background: quickInput.templateId === t.id ? `${tokens.accent}14` : tokens.bg.s2,
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="tpl"
+                    checked={quickInput.templateId === t.id}
+                    onChange={() => setQuickField('templateId', t.id as SiteTemplateId)}
+                    style={{ marginTop: 4 }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
+                    <div style={{ fontSize: 12, color: tokens.text.faint, marginTop: 4 }}>{t.description}</div>
+                    <div style={{ fontSize: 11, color: tokens.text.faint, marginTop: 6, fontFamily: 'ui-monospace, monospace' }}>
+                      {t.engineFile}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#FFE34D', marginTop: 4 }}>{t.designNote}</div>
+                  </div>
+                </label>
+              ))}
             </div>
           </section>
 

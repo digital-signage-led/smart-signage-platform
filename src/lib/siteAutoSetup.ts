@@ -3,6 +3,7 @@
  */
 
 import { lookupAmedasPoint } from '../data/amedasPoints';
+import { lookupSitePlace } from '../data/sitePlaces';
 import { jmaAreaForPrefecture } from '../data/jmaAreaCodes';
 import { SITE_TEMPLATES, templateIdForProject, type SiteTemplateId } from '../data/projectTemplates';
 import { DEFAULT_MOE_GAS_URL } from './signageRuntimeConfig';
@@ -15,8 +16,9 @@ import { SCENE_CATALOG } from '../data/mock';
 import { L } from '../i18n/labels';
 import { cycleLapTotal } from './sceneCycle';
 import { defaultSceneIds } from './sceneList';
-import type { Project, ProjectForm, SceneItem, DataSource } from '../types';
+import type { Project, ProjectForm, SceneItem, DataSource, CorpTitlePos } from '../types';
 import type { SceneConfig } from './storage';
+import { normalizeLogoKey } from './companies';
 import { normalizeMultilangLangs } from './multilang';
 
 export type LocationIdKind = 'amedas' | 'ecs' | 'loid' | 'unknown';
@@ -25,6 +27,7 @@ export interface QuickSetupInput {
   templateId: SiteTemplateId;
   company: string;
   companyId?: string;
+  corpTitlePos?: CorpTitlePos;
   listing?: 'paid' | 'demo';
   site: string;
   prefecture: string;
@@ -34,6 +37,9 @@ export interface QuickSetupInput {
   ecsLoId?: string;
   siteAddress?: string;
   contactName?: string;
+  /** 会社ロゴ（data URL または ./assets/...） */
+  logoSrc?: string;
+  logoName?: string;
 }
 
 export interface AutoSetupSummaryRow {
@@ -83,16 +89,17 @@ function buildSceneConfig(contracted: string[], source: Project['source'] = 'eda
   };
 }
 
-function resolvePointMeta(pointCode: string, prefecture: string) {
+function resolvePointMeta(pointCode: string, prefecture: string, siteText = '') {
   const known = lookupAmedasPoint(pointCode);
+  const place = lookupSitePlace(siteText);
   if (known) {
     return {
       prefecture: known.prefecture,
       jmaArea: known.jmaArea,
       moePointName: known.name,
-      jmaForecastLabel: known.forecastLabel,
-      warnCity: known.warnCity,
-      geo: known.geo,
+      jmaForecastLabel: place?.forecastLabel || known.forecastLabel,
+      warnCity: place?.warnCity || known.warnCity,
+      geo: place?.geo || known.geo,
     };
   }
   const jma = jmaAreaForPrefecture(prefecture);
@@ -100,9 +107,9 @@ function resolvePointMeta(pointCode: string, prefecture: string) {
     prefecture,
     jmaArea: jma.area,
     moePointName: jma.pointName,
-    jmaForecastLabel: prefecture.replace(/[都道府県]$/, '') || '現場',
-    warnCity: undefined as string | undefined,
-    geo: undefined as { lat: number; lon: number } | undefined,
+    jmaForecastLabel: place?.forecastLabel || prefecture.replace(/[都道府県]$/, '') || '現場',
+    warnCity: place?.warnCity,
+    geo: place?.geo,
   };
 }
 
@@ -165,7 +172,9 @@ export function buildAutoSetup(input: QuickSetupInput, cloneProject?: Project | 
     }
   }
 
-  const pointMeta = moePoint ? resolvePointMeta(moePoint, input.prefecture) : resolvePointMeta('', input.prefecture);
+  const pointMeta = moePoint
+    ? resolvePointMeta(moePoint, input.prefecture, `${input.site} ${input.siteAddress ?? ''}`)
+    : resolvePointMeta('', input.prefecture, `${input.site} ${input.siteAddress ?? ''}`);
   if (tpl.source === 'wxtech' && !pointMeta.geo && !cloneProject?.geo) {
     pointMeta.geo = { lat: 34.605184, lon: 135.470949 };
     pointMeta.jmaForecastLabel = '住之江区';
@@ -182,6 +191,7 @@ export function buildAutoSetup(input: QuickSetupInput, cloneProject?: Project | 
   const form: ProjectForm = {
     company: input.company.trim(),
     companyId: input.companyId?.trim() || cloneProject?.companyId || '',
+    corpTitlePos: input.corpTitlePos ?? cloneProject?.corpTitlePos ?? 'none',
     lifecycle: 'draft',
     listing: input.listing === 'demo' ? 'demo' : (cloneProject?.listing === 'demo' ? 'demo' : 'paid'),
     site: input.site.trim(),
@@ -221,6 +231,7 @@ export function buildAutoSetup(input: QuickSetupInput, cloneProject?: Project | 
 
   const projectFields: AutoSetupResult['projectFields'] = {
     company: form.company,
+    corpTitlePos: form.corpTitlePos,
     site: form.site,
     plan: form.plan,
     listing: form.listing,
@@ -243,7 +254,9 @@ export function buildAutoSetup(input: QuickSetupInput, cloneProject?: Project | 
     jmaWarnCity: form.jmaWarnCity.trim() || pointMeta.warnCity || cloneProject?.jmaWarnCity,
     engineFile: tpl.engineFile,
     bosaiOnly: cloneProject?.bosaiOnly === true ? true : false,
-    footBannerSrc: tpl.footBannerSrc ?? cloneProject?.footBannerSrc,
+    footBannerSrc: /鴻治/.test(form.company)
+      ? (tpl.footBannerSrc ?? cloneProject?.footBannerSrc)
+      : undefined,
     footSourceEcs,
     wxtechSite: source === 'wxtech' ? sourceId : undefined,
     wxtechGasUrl: cloneProject?.wxtechGasUrl,
@@ -253,7 +266,9 @@ export function buildAutoSetup(input: QuickSetupInput, cloneProject?: Project | 
       if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
       return pointMeta.geo ?? cloneProject?.geo;
     })(),
-    logoSrc: tpl.logoSrc ?? cloneProject?.logoSrc ?? './assets/greencross_logo.png',
+    logoSrc: input.logoSrc?.trim()
+      || (/鴻治/.test(form.company) ? (tpl.logoSrc || cloneProject?.logoSrc) : undefined),
+    logoKey: normalizeLogoKey(input.logoSrc) || cloneProject?.logoKey || normalizeLogoKey(tpl.logoSrc),
   };
 
   const sceneConfig = buildSceneConfig(contracted, source);
@@ -285,6 +300,7 @@ export function buildAutoSetup(input: QuickSetupInput, cloneProject?: Project | 
   summary.push(
     { label: '予報区域', value: jmaArea },
     { label: '地点名', value: form.moePointName },
+    { label: 'ロゴ', value: input.logoSrc?.trim() ? (input.logoName?.trim() || '指定あり') : 'テンプレート既定' },
     { label: '契約シーン', value: contracted.map((c) => SCENE_CATALOG[c]?.label ?? c).join(' / ') },
     { label: '1周計', value: L.scene.totalCycle(cycleLapTotal(sceneConfig.scenes)) },
   );
@@ -327,6 +343,7 @@ export function cloneQuickInputFromProject(p: Project): QuickSetupInput {
     templateId: templateIdForProject(p),
     company: p.company,
     companyId: p.companyId ?? '',
+    corpTitlePos: p.corpTitlePos ?? 'none',
     listing: p.listing === 'demo' ? 'demo' : 'paid',
     site: '',
     prefecture: p.prefecture ?? '',
@@ -335,6 +352,8 @@ export function cloneQuickInputFromProject(p: Project): QuickSetupInput {
     ecsLoId: p.source === 'device' ? '' : '',
     siteAddress: '',
     contactName: '',
+    logoSrc: p.logoSrc,
+    logoName: p.logoKey,
   };
 }
 
@@ -342,12 +361,12 @@ export function cloneQuickInputFromProject(p: Project): QuickSetupInput {
 export function patchFormFromPoint(
   pointCode: string,
   prefecture: string,
-  partial: Pick<ProjectForm, 'source' | 'site'>,
+  partial: Pick<ProjectForm, 'source' | 'site' | 'siteAddress'>,
 ): Partial<ProjectForm> {
   const code = pointCode.trim();
   if (!/^\d{5}$/.test(code)) return {};
 
-  const meta = resolvePointMeta(code, prefecture);
+  const meta = resolvePointMeta(code, prefecture, `${partial.site} ${partial.siteAddress ?? ''}`);
   const jma = jmaAreaForPrefecture(meta.prefecture || prefecture);
 
   return {
@@ -355,64 +374,49 @@ export function patchFormFromPoint(
     jmaPoint: code,
     jmaArea: meta.jmaArea || jma.area,
     moePointName: meta.moePointName,
-    jmaForecastLabel: meta.jmaForecastLabel || partial.site.trim(),
     prefecture: meta.prefecture || prefecture,
-    ...(meta.warnCity ? { jmaWarnCity: meta.warnCity } : {}),
-    ...(meta.geo
-      ? { geoLat: String(meta.geo.lat), geoLon: String(meta.geo.lon) }
-      : {}),
     ...(partial.source === 'jma' ? { sourceId: code } : {}),
   };
 }
 
-/** テンプレート複製元からクイック作成の初期値を生成 */
-export function quickSampleForTemplate(templateId: SiteTemplateId, clone?: Project | null): QuickSetupInput {
+/** 新規作成の空フォーム（サンプル会社は入れない） */
+export function emptyQuickInput(templateId: SiteTemplateId = 'face4_jma'): QuickSetupInput {
   const tpl = SITE_TEMPLATES[templateId];
-  const base: QuickSetupInput = {
+  return {
     templateId,
+    company: '',
+    companyId: '',
+    corpTitlePos: 'none',
+    listing: 'paid',
+    site: '',
+    prefecture: '',
+    locationId: '',
+    ecsDataId: tpl.source === 'device' ? '' : '',
+    ecsLoId: '',
+    siteAddress: '',
+    contactName: '',
+    logoSrc: '',
+    logoName: '',
+  };
+}
+
+/** テンプレート複製元からクイック作成の初期値を生成（新規は emptyQuickInput を使う） */
+export function quickSampleForTemplate(templateId: SiteTemplateId, clone?: Project | null): QuickSetupInput {
+  return {
+    ...emptyQuickInput(templateId),
     company: clone?.company ?? '',
     companyId: clone?.companyId ?? '',
+    corpTitlePos: clone?.corpTitlePos ?? 'none',
     listing: clone?.listing === 'demo' ? 'demo' : 'paid',
     site: clone?.site ?? '',
     prefecture: clone?.prefecture ?? '',
     locationId: clone?.moePoint ?? clone?.sourceId ?? '',
-    ecsDataId: tpl.source === 'device' ? (clone?.sourceId ?? tpl.defaultEcsDataId ?? '') : '',
+    ecsDataId: SITE_TEMPLATES[templateId].source === 'device' ? (clone?.sourceId ?? '') : '',
     ecsLoId: clone?.ecsLoId ?? '',
     siteAddress: clone?.siteAddress ?? '',
-    contactName: '',
+    logoSrc: clone?.logoSrc,
+    logoName: clone?.logoKey,
   };
-  if (templateId === 'face4_jma') {
-    base.locationId = base.locationId || '67116';
-    base.prefecture = base.prefecture || '広島県';
-    if (!base.company) base.company = '鴻治組';
-    if (!base.site) base.site = '庄原市会場';
-    if (!base.siteAddress) base.siteAddress = '〒729-5601 広島県庄原市西城町小鳥原';
-  } else if (templateId === 'face4_okinawa_kumejima') {
-    base.locationId = base.locationId || '91166';
-    base.prefecture = base.prefecture || '沖縄県';
-    if (!base.company) base.company = '沖縄DS';
-    if (!base.site) base.site = '久米島';
-    if (!base.siteAddress) base.siteAddress = '沖縄県島尻郡久米島町';
-  } else if (templateId === 'face5_standard') {
-    base.locationId = base.locationId || '62078';
-    base.prefecture = base.prefecture || '大阪府';
-    if (!base.company) base.company = clone?.company || '近江八幡組';
-    if (!base.site) base.site = clone?.site || '八幡工区';
-    if (!base.siteAddress) {
-      base.siteAddress = clone?.siteAddress || '大阪府大阪市住之江区新北島一丁目';
-    }
-  } else if (templateId === 'face4_ecs') {
-    base.locationId = base.locationId || '71106';
-    base.ecsDataId = base.ecsDataId || '1050';
-    base.ecsLoId = base.ecsLoId || '019373';
-    base.prefecture = base.prefecture || '徳島県';
-    if (!base.company) base.company = '佐々木建設';
-    if (!base.site) base.site = '老門作業所';
-    if (!base.siteAddress) {
-      base.siteAddress = '〒771-0203 徳島県板野郡北島町中村前須13-9';
-    }
-  }
-  return base;
 }
 
 export function patchQuickInputFromPoint(

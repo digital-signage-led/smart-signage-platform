@@ -17,7 +17,7 @@ function sourceLabel(p: Project): string {
 }
 
 export function StudioHomePage() {
-  const { projects, openQuickSetup, openScene, openDeploy, openCloneSetup, copyProjectUrl } = useApp();
+  const { projects, openQuickSetup, openScene, openDeploy, openCloneSetup, copyProjectUrl, askDeleteProject, exportListsPdf } = useApp();
 
   const list = useMemo(
     () => [...projects].sort(
@@ -50,7 +50,12 @@ export function StudioHomePage() {
             gap: 10,
           }}
         >
-          <span style={{ fontFamily: 'monospace', fontSize: 11, color: tokens.text.muted }}>{p.id}</span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: tokens.text.muted }}>{p.id}</span>
+            <Button variant="danger" onClick={() => askDeleteProject(p)} style={{ height: 28, fontSize: 12, padding: '0 10px' }}>
+              {L.list.delete}
+            </Button>
+          </div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>{p.company}</div>
             <div style={{ fontSize: 13, color: tokens.text.muted }}>{p.site}</div>
@@ -88,7 +93,10 @@ export function StudioHomePage() {
         flexWrap: 'wrap',
       }}>
         <h1 style={{ margin: 0, fontSize: 27, fontWeight: 700, letterSpacing: '-0.02em' }}>{L.studio.title}</h1>
-        <Button onClick={openQuickSetup}>{L.studio.ctaNew}</Button>
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+          <Button variant="secondary" onClick={exportListsPdf}>{L.list.pdfExport}</Button>
+          <Button onClick={openQuickSetup}>{L.studio.ctaNew}</Button>
+        </div>
       </header>
 
       {list.length === 0 ? (

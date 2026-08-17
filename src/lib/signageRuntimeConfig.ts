@@ -10,7 +10,8 @@ import {
   resolveEcsLoId,
 } from './externalApiScenes';
 export { DEFAULT_ECS_GAS_URL };
-import type { Project } from '../types';
+import type { Project, CorpTitlePos } from '../types';
+import { detectCorpTitlePos, formatLegalCompanyName } from './companyName';
 
 export const DEFAULT_MOE_GAS_URL =
   'https://script.google.com/macros/s/AKfycbzSTsappgfJTaJruOBJsbnCXSTPkeTBp39CXpvoSZsPQ0mWGs4KjSonC8_eZ2b1EeUXTQ/exec';
@@ -92,11 +93,8 @@ export interface SignageRuntimePayload {
   SIGNAGE_CONFIG: SignageRuntimeLogoConfig;
 }
 
-function companyLabel(company: string): string {
-  const c = company.trim();
-  if (!c) return '';
-  if (/株式会社|有限会社|合同会社/.test(c)) return c;
-  return `${c}株式会社`;
+function companyLabel(company: string, pos?: CorpTitlePos): string {
+  return formatLegalCompanyName(company, pos ?? detectCorpTitlePos(company));
 }
 
 function ecsProxyUrl(): string {
@@ -118,7 +116,7 @@ export function buildSignageRuntimeConfig(
   prefecture = '',
   message?: SignageMessageOptions,
 ): SignageRuntimePayload {
-  const customer = companyLabel(project.company);
+  const customer = companyLabel(project.company, project.corpTitlePos);
   const siteLabel = customer || project.company.trim();
   const moePoint = project.moePoint?.trim() || project.jmaPoint?.trim() || '71106';
   const jmaPoint = project.jmaPoint?.trim() || moePoint;

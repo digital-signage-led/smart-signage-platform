@@ -21,6 +21,7 @@ export const AMEDAS_POINTS: Record<string, AmedasPointEntry> = {
   '59263': { code: '59263', name: '堺', prefecture: '大阪府', jmaArea: '270000', forecastLabel: '堺市', warnCity: '2714000', geo: { lat: 34.5733, lon: 135.4831 } },
   '91166': { code: '91166', name: '久米島', prefecture: '沖縄県', jmaArea: '471000', forecastLabel: '久米島', warnCity: '4736100', geo: { lat: 26.3406, lon: 126.805 } },
   '67116': { code: '67116', name: '庄原', prefecture: '広島県', jmaArea: '340000', forecastLabel: '庄原市', warnCity: '3421000', geo: { lat: 35.0375, lon: 133.1601 } },
+  '64036': { code: '64036', name: '奈良', prefecture: '奈良県', jmaArea: '290000', forecastLabel: '奈良市', warnCity: '2920100', geo: { lat: 34.6851, lon: 135.8328 } },
 };
 
 export function lookupAmedasPoint(code: string): AmedasPointEntry | null {

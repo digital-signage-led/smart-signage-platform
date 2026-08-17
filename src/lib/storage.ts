@@ -91,6 +91,7 @@ function mergeProjectWithSeed(stored: Project): Project {
     logoKey: stored.logoKey ?? seed?.logoKey,
     lifecycle: stored.lifecycle ?? seed?.lifecycle,
     listing: stored.listing ?? seed?.listing,
+    corpTitlePos: stored.corpTitlePos ?? seed?.corpTitlePos,
   };
   return {
     ...withOpts,
@@ -107,14 +108,41 @@ function loadCompanies(parsed: Partial<AppStorage>, projects: Project[]): Compan
   const stored = parsed.companies?.length ? parsed.companies : INITIAL_COMPANIES;
   const repaired = stored.map((c) => {
     const seed = INITIAL_COMPANIES.find((s) => s.id === c.id);
-    if (seed && isGarbledJa(c.name)) return { ...c, name: seed.name };
+    const withPos = seed ? { ...c, corpTitlePos: c.corpTitlePos ?? seed.corpTitlePos } : c;
+    if (seed && isGarbledJa(c.name)) return { ...withPos, name: seed.name };
     if (isGarbledJa(c.name)) {
       const fromProj = projects.find((p) => p.companyId === c.id && p.company && !isGarbledJa(p.company));
-      if (fromProj) return { ...c, name: fromProj.company };
+      if (fromProj) return { ...withPos, name: fromProj.company };
     }
-    return c;
+    return withPos;
   });
-  return deriveCompaniesFromProjects(projects, repaired);
+  const byId = new Map(repaired.map((c) => [c.id, c]));
+  INITIAL_COMPANIES.forEach((seed) => {
+    const cur = byId.get(seed.id);
+    if (!cur) {
+      byId.set(seed.id, seed);
+      return;
+    }
+    byId.set(seed.id, {
+      ...cur,
+      logoKey: seed.id === 'morishita-gumi' ? (seed.logoKey || cur.logoKey) : (cur.logoKey || seed.logoKey),
+      footBannerKey: seed.id === 'morishita-gumi' ? (seed.footBannerKey || cur.footBannerKey) : (cur.footBannerKey || seed.footBannerKey),
+      corpTitlePos: cur.corpTitlePos ?? seed.corpTitlePos,
+    });
+  });
+  INITIAL_COMPANIES.forEach((seed) => {
+    const seedKey = seed.name.replace(/株式会社/g, '').replace(/\s+/g, '').trim();
+    const named = [...byId.values()].find((c) => c.name.replace(/株式会社/g, '').replace(/\s+/g, '').trim() === seedKey);
+    if (!named || named.id === seed.id) return;
+    if (named.footBannerKey && named.logoKey) return;
+    byId.set(named.id, {
+      ...named,
+      logoKey: named.logoKey || seed.logoKey,
+      footBannerKey: named.footBannerKey || seed.footBannerKey,
+      corpTitlePos: named.corpTitlePos ?? seed.corpTitlePos,
+    });
+  });
+  return deriveCompaniesFromProjects(projects, [...byId.values()]);
 }
 
 function repairEquip(eq: Equipment): Equipment {
@@ -141,7 +169,7 @@ export function loadStorage(): AppStorage {
       };
     }
     const parsed = JSON.parse(raw) as AppStorage;
-    const rawProjects = (parsed.projects?.length ? parsed.projects : INITIAL_PROJECTS).map(mergeProjectWithSeed);
+    const rawProjects = (Array.isArray(parsed.projects) ? parsed.projects : INITIAL_PROJECTS).map(mergeProjectWithSeed);
     const companies = loadCompanies(parsed, rawProjects);
     const projects = rawProjects.map((p) => enrichProjectRegistry(p, companies));
     return {

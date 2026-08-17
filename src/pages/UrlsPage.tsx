@@ -5,7 +5,7 @@ import { L } from '../i18n/labels';
 import { Button } from '../components/ui';
 
 export function UrlsPage() {
-  const { projects, copyProjectUrl, openDeploy, openScene, showToast, projectPublicUrl } = useApp();
+  const { projects, copyProjectUrl, openDeploy, openScene, showToast, projectPublicUrl, exportListsPdf } = useApp();
   const [q, setQ] = useState('');
 
   const rows = useMemo(() => {
@@ -53,9 +53,12 @@ export function UrlsPage() {
             {L.urls.subtitle(rows.length)}
           </p>
         </div>
-        <Button variant="secondary" disabled={rows.length === 0} onClick={copyAll}>
-          {L.urls.copyAll}
-        </Button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Button variant="secondary" disabled={rows.length === 0} onClick={copyAll}>
+            {L.urls.copyAll}
+          </Button>
+          <Button variant="secondary" onClick={exportListsPdf}>{L.list.pdfExport}</Button>
+        </div>
       </header>
 
       <input

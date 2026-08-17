@@ -10,11 +10,15 @@ export type EquipType = 'a35' | 'hide' | 'led' | 'other';
 export type MonStatus = 'ok' | 'warn' | 'down' | 'off';
 export type DataSource = 'edam' | 'jma' | 'manual' | 'device' | 'wxtech';
 export type SignageKind = 'cube' | 'strip';
+/** 会社名の株式会社の位置。prefix=前株 / suffix=後株 / none=付けない */
+export type CorpTitlePos = 'prefix' | 'suffix' | 'none';
 
 /** 会社マスタ — 社名・ロゴは会社単位（現場では共有） */
 export interface Company {
   id: string;
   name: string;
+  /** 株式会社の位置（会社マスタの初期値） */
+  corpTitlePos?: CorpTitlePos;
   /** public/signage/assets 内のファイル名（例: sasakikensetu_logo.png） */
   logoKey?: string;
   /** 下帯バナーのファイル名（任意） */
@@ -25,6 +29,8 @@ export interface Company {
 export interface Project {
   id: string;
   company: string;
+  /** 株式会社の位置（前株 / 後株 / なし） */
+  corpTitlePos?: CorpTitlePos;
   /** 会社マスタへの参照 */
   companyId?: string;
   /** assets 内ロゴファイル名（会社マスタから同期） */
@@ -88,6 +94,7 @@ export interface Project {
 
 export interface ProjectForm {
   company: string;
+  corpTitlePos: CorpTitlePos;
   companyId: string;
   lifecycle: LifecycleStatus;
   listing: ProjectListing;

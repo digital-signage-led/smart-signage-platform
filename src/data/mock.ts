@@ -2,7 +2,7 @@ import type { Project, Equipment, MonSite, DeployRecord, EquipLogEntry } from '.
 
 export const INITIAL_PROJECTS: Project[] = [
   {
-    id: 'sasaki', companyId: 'sasaki-kensetsu', company: '\u4f50\u3005\u6728\u5efa\u8a2d', site: '\u8001\u9580\u4f5c\u696d\u6240', status: 'ok', lifecycle: 'published',
+    id: 'sasaki', companyId: 'sasaki-kensetsu', company: '\u4f50\u3005\u6728\u5efa\u8a2d', corpTitlePos: 'suffix', site: '\u8001\u9580\u4f5c\u696d\u6240', status: 'ok', lifecycle: 'published',
     plan: 'standard', signageKind: 'cube', faces: 4, pixel: '512x128', lastDeploy: '2025-06-15', engine: 'v2.1',
     options: ['bousai', 'multilang', 'jishin', 'flood_info', 'landslide_info', 'surge_info', 'weather_warn', 'evac_info', 'nowcast'],
     contracted: ['rain_warn', 'flood_info', 'landslide_info', 'surge_info', 'weather_warn', 'evac_info', 'jishin', 'bousai', 'clock', 'message', 'multilang', 'nowcast'],
@@ -13,7 +13,7 @@ export const INITIAL_PROJECTS: Project[] = [
     deviceToken: 'a35_sasaki_001', engineFile: 'wbgt-cube-sasakikensetu-4face.html',
   },
   {
-    id: 'suminoe', companyId: 'digital-signage', company: '\u30c7\u30b8\u30bf\u30eb\u30b5\u30a4\u30cd\u30fc\u30b8', site: '\u4f4f\u4e4b\u6c5f\u4f1a\u5834', status: 'ok', lifecycle: 'published',
+    id: 'suminoe', companyId: 'digital-signage', company: '\u30c7\u30b8\u30bf\u30eb\u30b5\u30a4\u30cd\u30fc\u30b8', corpTitlePos: 'suffix', site: '\u4f4f\u4e4b\u6c5f\u4f1a\u5834', status: 'ok', lifecycle: 'published',
     listing: 'demo', plan: 'standard', signageKind: 'cube', faces: 4, pixel: '512x128', lastDeploy: '2025-08-01', engine: 'v2.1',
     options: [], contracted: ['clock', 'message'], source: 'wxtech', sourceId: 'suminoe', wxtechSite: 'suminoe', prefecture: '\u5927\u962a\u5e9c',
     siteAddress: '\u5927\u962a\u5e9c\u5927\u962a\u5e02\u4f4f\u4e4b\u6c5f\u533a\u65b0\u5317\u5cf6\u4e00\u4e01\u76ee', jmaForecastLabel: '\u4f4f\u4e4b\u6c5f\u533a', geo: { lat: 34.605184, lon: 135.470949 },
@@ -72,7 +72,7 @@ export const INITIAL_PROJECTS: Project[] = [
     deviceToken: 'a35_kumejima_001',
   },
   {
-    id: 'shobara', companyId: 'kohji-gumi', company: '\u9d3b\u6cbb\u7d44', site: '\u5e84\u539f\u5e02\u4f1a\u5834', status: 'ok', lifecycle: 'published',
+    id: 'shobara', companyId: 'kohji-gumi', company: '\u9d3b\u6cbb\u7d44', corpTitlePos: 'prefix', site: '\u5e84\u539f\u5e02\u4f1a\u5834', status: 'ok', lifecycle: 'published',
     plan: 'standard', signageKind: 'cube', faces: 4, pixel: '512x128', lastDeploy: '2026-08-01', engine: 'v2.1',
     options: ['bousai', 'multilang', 'jishin', 'flood_info', 'landslide_info', 'surge_info', 'weather_warn', 'evac_info', 'nowcast'],
     contracted: ['rain_warn', 'flood_info', 'landslide_info', 'surge_info', 'weather_warn', 'evac_info', 'jishin', 'bousai', 'clock', 'message', 'multilang', 'nowcast'],

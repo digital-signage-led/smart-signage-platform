@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { tokens } from '../tokens';
 import { useApp } from '../context/AppContext';
 import { L } from '../i18n/labels';
-import { deployBlocked } from '../lib/deploy';
+import { locationReadyForPublish } from '../lib/deploy';
 import { Button } from '../components/ui';
 import { inputStyle } from '../lib/meta';
+import { sitePlacePatch } from '../data/sitePlaces';
+import { compressLogoDataUrl } from '../lib/signageLogo';
 import type { DeployRecord } from '../types';
 
 export function DeployPage() {
@@ -14,10 +17,30 @@ export function DeployPage() {
     patchSceneProject, openCloneSetup,
   } = useApp();
   const accent = tokens.accent;
-  const blocked = deployBlocked(deployChecks);
+  const blocked = !sceneProject || !locationReadyForPublish(sceneProject);
   const url = publicSignageUrl || sceneProject?.publishedUrl || '';
   const canExportHtml = sceneProject?.faces === 4 && sceneProject.source !== 'manual';
   const issued = Boolean(sceneProject?.publishedUrl);
+
+  const [latDraft, setLatDraft] = useState('');
+  const [lonDraft, setLonDraft] = useState('');
+
+  useEffect(() => {
+    setLatDraft(sceneProject?.geo != null ? String(sceneProject.geo.lat) : '');
+    setLonDraft(sceneProject?.geo != null ? String(sceneProject.geo.lon) : '');
+  }, [sceneProject?.id, sceneProject?.geo?.lat, sceneProject?.geo?.lon]);
+
+  useEffect(() => {
+    const src = sceneProject?.logoSrc || '';
+    const id = sceneProject?.id;
+    if (!id || !src.startsWith('data:image/') || src.length <= 24000) return;
+    let cancelled = false;
+    void compressLogoDataUrl(src).then((next) => {
+      if (cancelled || !next || next === src || next.length >= src.length) return;
+      patchSceneProject({ logoSrc: next });
+    });
+    return () => { cancelled = true; };
+  }, [sceneProject?.id, sceneProject?.logoSrc, patchSceneProject]);
 
   const copyText = async (text: string, okMsg: string) => {
     if (!text) return;
@@ -33,13 +56,21 @@ export function DeployPage() {
     patchSceneProject({ [key]: value });
   };
 
-  const setGeo = (which: 'lat' | 'lon', value: string) => {
-    const n = Number(value);
+  const commitGeo = (which: 'lat' | 'lon', raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      if (which === 'lat') setLatDraft(sceneProject?.geo != null ? String(sceneProject.geo.lat) : '');
+      else setLonDraft(sceneProject?.geo != null ? String(sceneProject.geo.lon) : '');
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) {
+      showToast(which === 'lat' ? '緯度は数値で入力してください' : '経度は数値で入力してください');
+      return;
+    }
     const geo = sceneProject?.geo ?? { lat: 0, lon: 0 };
     patchSceneProject({
-      geo: which === 'lat'
-        ? { lat: Number.isFinite(n) ? n : geo.lat, lon: geo.lon }
-        : { lat: geo.lat, lon: Number.isFinite(n) ? n : geo.lon },
+      geo: which === 'lat' ? { lat: n, lon: geo.lon } : { lat: geo.lat, lon: n },
     });
   };
 
@@ -77,19 +108,58 @@ export function DeployPage() {
       }}>
         <h2 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700 }}>{L.deploy.locationTitle}</h2>
         <p style={{ margin: '0 0 14px', fontSize: 12.5, color: tokens.text.muted, lineHeight: 1.6 }}>{L.deploy.locationHint}</p>
+        <div style={{ fontSize: 12, fontWeight: 700, color: tokens.text.faint, marginBottom: 10 }}>{L.deploy.stationGroup}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {sceneProject.source === 'device' && locField(L.form.deviceId, sceneProject.sourceId || '', (v) => setPoint('sourceId', v))}
           {sceneProject.source === 'device' && locField(L.form.ecsLoId, sceneProject.ecsLoId || '', (v) => setPoint('ecsLoId', v))}
           {locField(L.form.moePoint, sceneProject.moePoint || '', (v) => setPoint('moePoint', v))}
           {locField(L.form.jmaPoint, sceneProject.jmaPoint || '', (v) => setPoint('jmaPoint', v))}
           {locField(L.form.jmaArea, sceneProject.jmaArea || '', (v) => setPoint('jmaArea', v))}
-          {locField(L.form.jmaWarnCity, sceneProject.jmaWarnCity || '', (v) => setPoint('jmaWarnCity', v))}
-          {locField(L.form.geoLat, sceneProject.geo != null ? String(sceneProject.geo.lat) : '', (v) => setGeo('lat', v))}
-          {locField(L.form.geoLon, sceneProject.geo != null ? String(sceneProject.geo.lon) : '', (v) => setGeo('lon', v))}
         </div>
-        <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: tokens.text.faint, margin: '18px 0 10px' }}>{L.deploy.siteGroup}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {locField(L.form.jmaWarnCity, sceneProject.jmaWarnCity || '', (v) => setPoint('jmaWarnCity', v))}
+          <div />
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: tokens.text.tertiary, marginBottom: 6 }}>{L.form.geoLat}</label>
+            <input
+              value={latDraft}
+              inputMode="decimal"
+              onChange={(e) => setLatDraft(e.target.value)}
+              onBlur={() => commitGeo('lat', latDraft)}
+              style={inputStyle(false)}
+              placeholder="34.555"
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: tokens.text.tertiary, marginBottom: 6 }}>{L.form.geoLon}</label>
+            <input
+              value={lonDraft}
+              inputMode="decimal"
+              onChange={(e) => setLonDraft(e.target.value)}
+              onBlur={() => commitGeo('lon', lonDraft)}
+              style={inputStyle(false)}
+              placeholder="135.785"
+            />
+          </div>
+        </div>
+        <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const patch = sitePlacePatch(sceneProject.site, sceneProject.siteAddress);
+              if (!patch) {
+                showToast(L.deploy.applySiteGeoMiss);
+                return;
+              }
+              patchSceneProject(patch);
+              showToast(L.deploy.applySiteGeoOk);
+            }}
+          >
+            {L.deploy.applySiteGeo}
+          </Button>
           <Button variant="secondary" onClick={() => openCloneSetup(sceneProject)}>{L.studio.clone}</Button>
-          <span style={{ marginLeft: 10, fontSize: 12, color: tokens.text.faint }}>{L.deploy.cloneHint}</span>
+          <span style={{ fontSize: 12, color: tokens.text.faint }}>{L.deploy.cloneHint}</span>
         </div>
       </section>
 
@@ -134,10 +204,12 @@ export function DeployPage() {
         <Button style={{ width: '100%', height: 48, marginTop: 16 }} disabled={blocked} onClick={askDeploy}>
           {L.deploy.run}
         </Button>
-        {dpStatus === 'done' && <p style={{ color: tokens.status.ok, marginTop: 12 }}>{L.deploy.done}</p>}
+        {dpStatus === 'done' && !blocked && (
+          <p style={{ color: tokens.status.ok, marginTop: 12 }}>{L.deploy.done}</p>
+        )}
         {blocked && (
           <p style={{ color: tokens.status.down, marginTop: 12, fontSize: 13 }}>
-            地点やシーンのチェックが未完了のため発行できません
+            WBGT／AMeDAS の地点IDを入れると発行できます
           </p>
         )}
       </section>

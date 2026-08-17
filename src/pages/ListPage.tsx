@@ -38,7 +38,7 @@ export function ListPage() {
     listPrefecture, setListPrefecture,
     listListing, setListListing,
     listView, setListView, openEdit, setPage,
-    copyProjectUrl, openScene, openDeploy, openCloneSetup,
+    copyProjectUrl, openScene, openDeploy, openCloneSetup, askDeleteProject, exportListsPdf,
   } = useApp();
   const accent = tokens.accent;
 
@@ -74,6 +74,7 @@ export function ListPage() {
           <p style={{ margin: '8px 0 0', fontSize: 12.5, color: tokens.text.faint, maxWidth: 560 }}>{L.list.registryHint}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={exportListsPdf}>{L.list.pdfExport}</Button>
           <Button onClick={() => setPage('studio')}>{L.list.goStudio}</Button>
         </div>
       </header>
@@ -173,6 +174,7 @@ export function ListPage() {
                 <Button variant="secondary" style={{ height: 30, fontSize: 12, padding: '0 10px' }} onClick={() => openScene(p)}>{L.list.openStudio}</Button>
                 <Button variant="secondary" style={{ height: 30, fontSize: 12, padding: '0 10px' }} onClick={() => openDeploy(p)}>{L.studio.openDeploy}</Button>
                 <Button variant="secondary" style={{ height: 30, fontSize: 12, padding: '0 10px' }} onClick={() => openCloneSetup(p)}>{L.list.clone}</Button>
+                <Button variant="danger" style={{ height: 30, fontSize: 12, padding: '0 10px' }} onClick={() => askDeleteProject(p)}>{L.list.delete}</Button>
               </div>
             </div>
           ))}
@@ -182,13 +184,16 @@ export function ListPage() {
           {sorted.map((p) => {
             return (
               <div key={p.id} style={{ background: tokens.bg.s1, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 15, padding: '16px 18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: tokens.text.muted }}>{p.id}</span>
-                  {listingOf(p) === 'demo' ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#FF9F0A' }}>{L.listing.demo}</span>
-                  ) : (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: tokens.status.ok }}>{L.listing.paid}</span>
-                  )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 11, color: tokens.text.muted }}>{p.id}</span>
+                    {listingOf(p) === 'demo' ? (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#FF9F0A' }}>{L.listing.demo}</span>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: tokens.status.ok }}>{L.listing.paid}</span>
+                    )}
+                  </div>
+                  <Button variant="danger" style={{ height: 28, fontSize: 12, padding: '0 10px' }} onClick={() => askDeleteProject(p)}>{L.list.delete}</Button>
                 </div>
                 <div style={{ fontSize: 17, fontWeight: 700, cursor: 'pointer' }} onClick={() => openEdit(p)}>{p.company}</div>
                 <div style={{ fontSize: 13, color: tokens.text.muted, marginBottom: 10 }}>{p.site}</div>

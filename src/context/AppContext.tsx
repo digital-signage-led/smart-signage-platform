@@ -1,14 +1,13 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   INITIAL_EQUIP_LOG,
-  INITIAL_PROJECTS,
   SCENE_CATALOG, CURRENT_USER, MON_DATA,
 } from '../data/mock';
 import { genToken, nowStr, slugId } from '../lib/format';
 import { loadStorage, saveStorage, type SceneConfig } from '../lib/storage';
 import type { SceneMediaAsset, SceneMediaMap } from '../lib/sceneMedia';
 import type { SignageDeployConfig } from '../lib/signageConfig';
-import { buildDeployUrl, buildPublicSignageUrl, buildProjectPublicUrl, buildSignageConfig, canPreviewScene, deployBlocked, enabledEngineLoopKeys, resolveSignageContentOptions, runDeployChecks, type DeployCheck } from '../lib/deploy';
+import { buildDeployUrl, buildPublicSignageUrl, buildProjectPublicUrl, buildSignageConfig, canPreviewScene, enabledEngineLoopKeys, locationReadyForPublish, resolveSignageContentOptions, runDeployChecks, type DeployCheck } from '../lib/deploy';
 import {
   buildRuntimeExportBundle,
   buildSiteSignageHtml,
@@ -17,7 +16,7 @@ import {
   suggestedHtmlFilename,
 } from '../lib/signageHtmlExport';
 import { runtimeConfigJson } from '../lib/signageRuntimeConfig';
-import { ensureEcsScene, ensureWxtechScene, ensureAmedasScene, ensureMultilangScene, ensureContractedScenes, defaultSceneIds, normalizeProjectContracted, sortRotationByLoopOrder, rotationLoopOrderIndex, syncExternalApiScenes } from '../lib/sceneList';
+import { ensureEcsScene, ensureWxtechScene, ensureAmedasScene, ensureMultilangScene, ensureContractedScenes, defaultSceneIds, normalizeProjectContracted, sortRotationByLoopOrder, syncExternalApiScenes } from '../lib/sceneList';
 import { isRetiredContentSceneId } from '../lib/contentScenes';
 import { isExternalApiSceneId, projectAfterExternalApiToggle } from '../lib/externalApiScenes';
 import { sceneLapDisplayMs, reorderRotationScenes, isRotationLoopScene, clampSceneLaps, sortPlaylistByEnabled, enabledPreviewPlaybackScenes } from '../lib/sceneCycle';
@@ -36,6 +35,8 @@ import type {
   Page, Project, ProjectForm, SceneItem, DeployRecord, Equipment, EquipLogEntry,
   MonRecord, ConfirmConfig, MonSite, Company,
 } from '../types';
+import { L } from '../i18n/labels';
+import { printAllListsPdf } from '../lib/listPdf';
 import {
   applyCompanyToProjectFields,
   companyIdFromName,
@@ -47,9 +48,9 @@ import {
 import {
   buildAutoSetup,
   cloneQuickInputFromProject,
+  emptyQuickInput,
   patchFormFromPoint,
   patchQuickInputFromPoint,
-  quickSampleForTemplate,
   validateQuickSetup,
   type AutoSetupResult,
   type QuickSetupInput,
@@ -64,7 +65,7 @@ import { SITE_TEMPLATES } from '../data/projectTemplates';
 
 function emptyForm(): ProjectForm {
   return {
-    company: '', companyId: '', lifecycle: 'draft', listing: 'paid', site: '', prefecture: '', contactName: '', tel: '', email: '',
+    company: '', companyId: '', corpTitlePos: 'none', lifecycle: 'draft', listing: 'paid', site: '', prefecture: '', contactName: '', tel: '', email: '',
     plan: 'standard', signageKind: 'cube', faces: '4', pixel: '512x128',
     options: { rain_warn: false, flood_info: false, landslide_info: false, surge_info: false, weather_warn: false, evac_info: false, jishin: false, bousai: false, multilang: false, slogan: false, wind_meter: false, nowcast: false, video: false, pdf: false },
     contractDate: '', source: 'edam', sourceId: '', moePoint: '', jmaPoint: '', jmaArea: '',
@@ -78,7 +79,7 @@ function formFromProject(p: Project): ProjectForm {
   const kind = p.signageKind ?? inferSignageKind(p.faces);
   const spec = displaySpecForSignage(kind, p.faces);
   return {
-    company: p.company, companyId: p.companyId ?? '', lifecycle: lifecycleOf(p),
+    company: p.company, companyId: p.companyId ?? '', corpTitlePos: p.corpTitlePos ?? 'none', lifecycle: lifecycleOf(p),
     listing: p.listing === 'demo' ? 'demo' : 'paid',
     site: p.site, prefecture: p.prefecture ?? '', contactName: '', tel: '', email: '',
     plan: p.plan, signageKind: kind, faces: String(spec.faces), pixel: spec.pixelLabel,
@@ -194,8 +195,7 @@ function normalizeScenes(scenes: SceneItem[]): SceneItem[] {
 }
 
 function defaultQuickInput(): QuickSetupInput {
-  const shobara = INITIAL_PROJECTS.find((p) => p.id === 'shobara') ?? null;
-  return quickSampleForTemplate('face4_jma', shobara);
+  return emptyQuickInput('face4_jma');
 }
 
 interface AppContextValue {
@@ -207,6 +207,7 @@ interface AppContextValue {
   applyCompanyToForm: (companyId: string) => void;
   copyProjectUrl: (p: Project) => void;
   projectPublicUrl: (p: Project) => string;
+  exportListsPdf: () => void;
   formMode: 'new' | 'edit';
   form: ProjectForm;
   formProject: Project | null;
@@ -216,6 +217,7 @@ interface AppContextValue {
   openQuickSetup: () => void;
   openCloneSetup: (p: Project) => void;
   openEdit: (p: Project) => void;
+  askDeleteProject: (p: Project) => void;
   backToList: (msg?: string) => void;
   backToStudio: (msg?: string) => void;
   setFormField: (k: keyof ProjectForm, v: ProjectForm[keyof ProjectForm]) => void;
@@ -452,6 +454,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...f,
       companyId: fields.companyId ?? '',
       company: fields.company,
+      corpTitlePos: fields.corpTitlePos ?? f.corpTitlePos,
     }));
     if (fields.logoSrc) {
       setLogo({ name: fields.logoKey || co.name, url: fields.logoSrc });
@@ -470,6 +473,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       () => showToast('URLをコピーしました'),
       () => showToast(url),
     );
+  };
+
+  const exportListsPdf = () => {
+    printAllListsPdf(projects, companies, projectPublicUrl);
+    showToast(L.list.pdfPrintHint);
   };
 
   const openNew = () => {
@@ -495,10 +503,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setQuickField = <K extends keyof QuickSetupInput>(k: K, v: QuickSetupInput[K]) => {
     setQuickInput((q) => {
       if (k === 'templateId') {
-        const tpl = SITE_TEMPLATES[v as QuickSetupInput['templateId']];
-        const clone = projects.find((p) => p.id === tpl.cloneProjectId) ?? null;
-        /* テンプレート切替時はサンプルを全面適用（デザイン固定エンジンに合わせた初期値） */
-        return quickSampleForTemplate(v as QuickSetupInput['templateId'], clone);
+        const nextId = v as QuickSetupInput['templateId'];
+        const tpl = SITE_TEMPLATES[nextId];
+        return {
+          ...q,
+          templateId: nextId,
+          ecsDataId: tpl.source === 'device' ? (q.ecsDataId || '') : '',
+          ecsLoId: tpl.source === 'device' ? (q.ecsLoId || '') : '',
+        };
       }
       let next = { ...q, [k]: v };
       if (k === 'locationId') {
@@ -592,6 +604,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPage('form');
   };
 
+  const askDeleteProject = (p: Project) => {
+    setConfirm({
+      open: true,
+      title: L.list.deleteTitle,
+      message: L.list.deleteMessage(p.company, p.site),
+      confirmLabel: L.list.delete,
+      danger: true,
+      onConfirm: () => {
+        const id = p.id;
+        setProjects((prev) => prev.filter((x) => x.id !== id));
+        setSceneByProject((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setSceneProject((cur) => (cur?.id === id ? null : cur));
+        setFormProject((cur) => (cur?.id === id ? null : cur));
+        setPage((pg) => {
+          const onThisProject =
+            (pg === 'form' && formProject?.id === id) ||
+            ((pg === 'scene' || pg === 'preview' || pg === 'deploy') && sceneProject?.id === id);
+          return onThisProject ? 'list' : pg;
+        });
+        showToast(L.list.deleted);
+      },
+    });
+  };
+
   const backToList = (msg?: string) => {
     setPage('list');
     if (msg) showToast(msg);
@@ -607,14 +648,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       let next = { ...f, [k]: v };
       const applyPointPatch = (code: string, source: ProjectForm['source']) => {
         if (!/^\d{5}$/.test(code.trim())) return;
-        next = { ...next, ...patchFormFromPoint(code.trim(), next.prefecture, { source, site: next.site }) };
+        next = { ...next, ...patchFormFromPoint(code.trim(), next.prefecture, { source, site: next.site, siteAddress: next.siteAddress }) };
       };
       if (k === 'moePoint') applyPointPatch(String(v), next.source);
       if (k === 'prefecture' && /^\d{5}$/.test(f.moePoint.trim())) {
-        next = { ...next, ...patchFormFromPoint(f.moePoint, String(v), { source: next.source, site: next.site }) };
+        next = { ...next, ...patchFormFromPoint(f.moePoint, String(v), { source: next.source, site: next.site, siteAddress: next.siteAddress }) };
       }
       if (k === 'sourceId' && next.source === 'jma') applyPointPatch(String(v), 'jma');
-      /* JMA連携を選んだ時点で観測所IDが5桁なら地名・予報区域を自動補完 */
       if (k === 'source' && next.source === 'jma' && /^\d{5}$/.test(next.sourceId.trim())) {
         applyPointPatch(next.sourceId, 'jma');
       }
@@ -681,6 +721,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...p,
           company: companyName,
           companyId: companyId || undefined,
+          corpTitlePos: form.corpTitlePos,
           logoKey,
           site: form.site.trim(),
           lifecycle,
@@ -729,6 +770,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           id,
           company: companyName,
           companyId: companyId || undefined,
+          corpTitlePos: form.corpTitlePos,
           logoKey,
           site: form.site.trim(),
           status: 'new',
@@ -1020,6 +1062,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [sceneProject, dpVersion, equip, contentOpts, loopKeys],
   );
 
+  useEffect(() => {
+    if (!sceneProject || !publicSignageUrl) return;
+    if (sceneProject.publishedUrl === publicSignageUrl) return;
+    const id = sceneProject.id;
+    setSceneProject((p) => (p && p.id === id ? { ...p, publishedUrl: publicSignageUrl } : p));
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, publishedUrl: publicSignageUrl } : p)));
+  }, [publicSignageUrl, sceneProject?.id]);
+
   const deployConfig = useMemo(
     () => (sceneProject ? buildSignageConfig(sceneProject, scenes, equip, dpVersion, rotation) : null),
     [sceneProject, scenes, equip, dpVersion, rotation],
@@ -1045,13 +1095,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const runDeploy = () => {
     if (!sceneProject) return;
-    if (deployBlocked(deployChecks)) {
-      showToast('地点やシーンのチェックが未完了のため発行できません');
+    if (!locationReadyForPublish(sceneProject)) {
+      showToast('地点ID（WBGT／AMeDAS）を入れてから発行してください');
       return;
     }
     const pubUrl = buildPublicSignageUrl(sceneProject, equip, { version: dpVersion, ...contentOpts, loopKeys });
     const today = nowStr().slice(0, 10);
-    const entry: DeployRecord = { dt: nowStr(), user: CURRENT_USER, version: dpVersion, status: 'success', target: 'URL発行' };
+    const entry: DeployRecord = { dt: nowStr(), user: CURRENT_USER, version: dpVersion, status: 'success', target: '本番' };
     setDpHistory((h) => [entry, ...h]);
     setProjects((prev) => prev.map((x) => x.id === sceneProject.id
       ? { ...x, lastDeploy: today, engine: dpVersion, publishedUrl: pubUrl, lifecycle: 'published', status: x.status === 'new' ? 'ok' : x.status }
@@ -1212,9 +1262,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [page, pvPlaying, pvIdx, pvSpeed, scenes, sceneProject, mediaByScene]);
 
   const value: AppContextValue = {
-    page, setPage, projects, companies, upsertCompany, applyCompanyToForm, copyProjectUrl, projectPublicUrl,
+    page, setPage, projects, companies, upsertCompany, applyCompanyToForm, copyProjectUrl, projectPublicUrl, exportListsPdf,
     formMode, form, formProject, errors, logo,
-    openNew, openQuickSetup, openCloneSetup, openEdit, backToList, backToStudio, setFormField, toggleFormOpt, validateAndSave, setLogo,
+    openNew, openQuickSetup, openCloneSetup, openEdit, askDeleteProject, backToList, backToStudio, setFormField, toggleFormOpt, validateAndSave, setLogo,
     listSearch, setListSearch, listCompanyId, setListCompanyId, listPrefecture, setListPrefecture,
     listListing, setListListing, listView, setListView,
     sceneProject, scenes, openScene, selectSceneProject, saveScenesNow, toggleScene, patchSceneProject, setSceneDuration, setSceneLaps, setCycleTotal, reorderScenes, reorderRotationScenes: reorderRotationScenesList, dragIndex, setDragIndex,

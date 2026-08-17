@@ -5,6 +5,7 @@ export const INITIAL_COMPANIES: Company[] = [
   {
     id: 'sasaki-kensetsu',
     name: '佐々木建設',
+    corpTitlePos: 'suffix',
     logoKey: 'sasakikensetu_logo.png',
     footBannerKey: 'sasakikensetu_foot_name.svg',
   },
@@ -13,6 +14,7 @@ export const INITIAL_COMPANIES: Company[] = [
     name: 'デジタルサイネージ',
     logoKey: 'greencross_logo.png',
     footBannerKey: 'greencross_foot_name.svg',
+    corpTitlePos: 'suffix',
   },
   { id: 'miyagawa-kogyo', name: '宮川興業' },
   { id: 'nara-daitetsu', name: '奈良大鉄' },
@@ -29,6 +31,14 @@ export const INITIAL_COMPANIES: Company[] = [
     id: 'kohji-gumi',
     name: '鴻治組',
     logoKey: 'kohji_logo.png',
+    corpTitlePos: 'prefix',
+  },
+  {
+    id: 'morishita-gumi',
+    name: '森下組',
+    corpTitlePos: 'prefix',
+    logoKey: 'morishita_logo.png',
+    footBannerKey: 'morishita_foot.png',
   },
   {
     id: 'okinawa-ds',

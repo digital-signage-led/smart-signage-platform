@@ -138,7 +138,7 @@ export const SITE_TEMPLATES: Record<SiteTemplateId, SiteTemplateDef> = {
 
 /** 既存案件から量産用テンプレートを推定（地点だけ変えて複製するとき） */
 export function templateIdForProject(p: {
-  source: DataSource;
+  source?: DataSource;
   faces: number;
   engineFile?: string;
 }): SiteTemplateId {
