@@ -1,0 +1,49 @@
+/* DSC 災害コンテンツガイドライン：角ゴシック UD（BIZ UDPGothic / SIL OFL）
+   サイネージ機は Google Fonts に届かないことが多いため同梱する。
+   実ファイルは Regular/Bold のみ。800/900 は偽ボールドせず Bold を使う。 */
+@font-face {
+  font-family: "BIZ UDPGothic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./biz-udpgothic-400.ttf") format("truetype");
+}
+@font-face {
+  font-family: "BIZ UDPGothic";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("./biz-udpgothic-400.ttf") format("truetype");
+}
+@font-face {
+  font-family: "BIZ UDPGothic";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("./biz-udpgothic-700.ttf") format("truetype");
+}
+@font-face {
+  font-family: "BIZ UDPGothic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("./biz-udpgothic-700.ttf") format("truetype");
+}
+@font-face {
+  font-family: "BIZ UDPGothic";
+  font-style: normal;
+  font-weight: 800;
+  font-display: block;
+  src: url("./biz-udpgothic-700.ttf") format("truetype");
+}
+@font-face {
+  font-family: "BIZ UDPGothic";
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url("./biz-udpgothic-700.ttf") format("truetype");
+}
+
+html, body {
+  font-synthesis: none;
+}

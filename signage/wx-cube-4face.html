@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<!-- wx-cube-4face / 気象サイネージ（本番 4面 512×128・ロゴ列なし） -->
+<!-- データ源: ウェザーニューズ WxTech 1kmメッシュ ピンポイント天気予報・体感予報 のみ -->
+<!-- 会場: 大阪府大阪市住之江区新北島１丁目９−３９ -->
+<!--
+  ============================================================
+  旧版（気象庁・環境省）からの変更点
+  ============================================================
+  【削除したもの】＝ WxTechトライアルで取得できないため
+    ・WBGT（暑さ指数）表示、WBGT段階色、WBGT多言語シーン
+    ・熱中症警戒アラート（環境省）
+    ・大雨警報／注意報の全5段階（気象庁 warning JSON）
+    ・雨雲ナウキャストによる降雨接近判定（気象庁タイル解析）
+    ・最大瞬間風速（gust）＝ WxTechに項目なし
+
+  【★重要★ 体感温度をWBGTの代わりにしていない】
+    feeltmp は黒球温度（輻射熱）を含まない別指標。
+    厚労省のWBGT基準を満たさないため、WBGTとしては一切表示しない。
+    画面上も「体感」と明記し、暑さ指数とは呼ばない。
+
+  【注意喚起の根拠を差し替え】
+    旧：WBGT値による5段階（環境省）
+    新：気温による3段階
+        厚労省2025年6月施行「WBGT28以上 または 気温31℃以上」のうち、
+        気温31℃以上は単独で正規の根拠になるため、そこだけを使う。
+        画面にも「気温基準」と明記し、WBGTと誤認させない。
+
+  【残した表示】＝ すべて WxTech から取得
+    天気 / 気温 / 体感温度 / 湿度 / 降水量 / 風向き / 風速 / 気圧
+    最高・最低気温 / 降水確率 / 4日予報
+  ============================================================
+-->
+<html lang="ja" class="native-640 layout-512">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>気象サイネージ 4面 - 住之江区</title>
+<!-- DSC 災害コンテンツガイドライン：角ゴシック UD。サイネージ機は Google Fonts に届かないことが多いため同梱する -->
+<link rel="stylesheet" href="./fonts/ud-gothic.css">
+<script>
+/** 4面 512×128 本番用。localhost は PC 確認用に拡大表示 */
+(function () {
+    var q = new URLSearchParams(location.search);
+    var localDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    var forceNative = localDev ? q.get('native640') === '1' : q.get('native640') !== '0';
+    function addBody_() {
+        if (!document.body) return;
+        document.body.classList.add('layout-512');
+        document.body.classList.toggle('native-640', forceNative);
+        document.body.classList.toggle('browser-preview', !forceNative);
+    }
+    document.documentElement.classList.add('layout-512');
+    document.documentElement.classList.toggle('native-640', forceNative);
+    document.documentElement.classList.toggle('browser-preview', !forceNative);
+    if (document.body) addBody_();
+    else document.addEventListener('DOMContentLoaded', addBody_);
+})();
+</script>
+<style>
+:root {
+    --led-foot-bar-bg: #fff9f0;
+    --led-foot-bar-h: 32px;
+    --led-col-body-h: 64px;
+    --led-col-main-h: 96px;
+    --led-foot-font: 15px;
+}
+/*
+ * コンテンツ画像の始まり = X.Y.0.0（左上原点）
+ * LEDプレーヤー／ブラウザとも canvas 左上を (0,0) に固定する。
+ */
+html {
+    margin: 0; padding: 0; width: 512px; height: 128px;
+    overflow: hidden; background: #000;
+}
+body {
+    margin: 0; padding: 0; width: 512px; height: 128px;
+    overflow: hidden; background-color: #000;
+    position: absolute; top: 0; left: 0;
+    /* 日本語・数値とも BIZ UDPGothic（DSC UD 角ゴシック）。同梱フォント必須 */
+    font-family: "BIZ UDPGothic", "Yu Gothic UI", "Meiryo", sans-serif;
+}
+html.native-640, body.native-640 {
+    width: 512px !important; height: 128px !important;
+    min-width: 512px; min-height: 128px; max-width: 512px; max-height: 128px;
+    margin: 0 !important; padding: 0 !important; overflow: hidden !important;
+    background: #000; top: 0 !important; left: 0 !important;
+}
+body.native-640 { display: block; position: absolute; top: 0; left: 0; }
+body.native-640 .canvas {
+    transform: none !important;
+    position: absolute !important; top: 0 !important; left: 0 !important;
+    margin: 0 !important; padding: 0 !important;
+}
+.canvas {
+    width: 512px; height: 128px;
+    position: absolute; top: 0; left: 0;
+    overflow: hidden; margin: 0; padding: 0;
+    display: flex; flex-direction: row; flex-wrap: nowrap; gap: 0;
+    transform-origin: 0 0; /* = X.Y.0.0 */
+}
+body.browser-preview {
+    width: 100vw; height: 100vh; min-height: 100vh;
+    display: block; background: #1a1a1a;
+    position: absolute; top: 0; left: 0;
+}
+body.browser-preview .canvas {
+    position: absolute !important; top: 0 !important; left: 0 !important;
+    transform: scale(min(calc(100vw / 512), calc(100vh / 128))) !important;
+    transform-origin: 0 0;
+}
+/* 4面（512×128）: ロゴ列なし */
+body.layout-512 .logo-panel { display: none !important; }
+
+.content-area {
+    width: 512px; height: 128px;
+    position: absolute; top: 0; left: 0;
+    overflow: hidden; margin: 0; padding: 0;
+    flex: 0 0 512px; flex-shrink: 0; background: #308DD8;
+}
+.content-area > .scene-strip-bg { z-index: 0; }
+.content-area > .scene { z-index: 1; will-change: transform; }
+.scene {
+    position: absolute; top: 0; left: 0; width: 512px; height: 128px;
+    display: none; overflow: hidden; box-sizing: border-box; backface-visibility: hidden;
+}
+.scene.active { display: block; }
+
+/* --- 512×128 一体ストリップ背景（列分割なし・縦線なし） --- */
+.scene-strip-bg {
+    position: absolute; left: 0; top: 0; width: 512px; height: 128px;
+    z-index: 0; pointer-events: none; display: flex; flex-direction: column; border: none;
+}
+.scene-strip-bg .col-bg-top  { width: 100%; height: 32px; flex-shrink: 0; }
+.scene-strip-bg .col-bg-body { width: 100%; height: var(--led-col-body-h); flex-shrink: 0; }
+.scene-strip-bg .col-bg-foot { width: 100%; height: var(--led-foot-bar-h); flex-shrink: 0; background: var(--led-foot-bar-bg); }
+
+/* 気温警戒（橙）時に本文を黒にする段階があれば使う。既定は白 */
+.content-area.col-bg-dark-text .s1-bar-label,
+.content-area.col-bg-dark-text .clock-hm,
+.content-area.col-bg-dark-text .s2-bar-label,
+.content-area.col-bg-dark-text .s2-num,
+.content-area.col-bg-dark-text .s2-unit,
+.content-area.col-bg-dark-text .s2-dir-text,
+.content-area.col-bg-dark-text .fl-bar-label,
+.content-area.col-bg-dark-text .fl-val,
+.content-area.col-bg-dark-text .d5-sep,
+.content-area.col-bg-dark-text .d5-temp { color: #000 !important; }
+
+/* ---------- 共通パネル ---------- */
+.panel, .s2-panel, .fl-panel, .d5-panel {
+    width: 128px; box-sizing: border-box; flex-shrink: 0; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    background: transparent; border: none;
+}
+.s1-top-bar, .s2-top-bar, .fl-top-bar {
+    width: 100%; height: 32px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.s1-body, .fl-body {
+    width: 100%; max-width: 128px; height: var(--led-col-body-h); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0 6px;
+    box-sizing: border-box;
+}
+/* 天気アイコン欠け防止: s2/d5 本文はクリップしない */
+.s2-body, .d5-body {
+    width: 100%; max-width: 128px; height: var(--led-col-body-h); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; overflow: visible; padding: 0 6px;
+    box-sizing: border-box;
+}
+.s1-bar-label, .s2-bar-label, .fl-bar-label {
+    font-size: 20px; font-weight: 700; color: #ebebeb; letter-spacing: 0.2px;
+    font-family: "BIZ UDPGothic", sans-serif; white-space: nowrap;
+    max-width: 124px; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
+    box-sizing: border-box; line-height: 1.05; text-align: center;
+}
+
+/* ---------- シーン1 時刻 ---------- */
+#scene1 .panel { height: var(--led-col-main-h); }
+.clock-hm {
+    display: inline-flex; flex-direction: row; align-items: center; justify-content: center;
+    white-space: nowrap; max-width: 124px; overflow: hidden;
+    font-size: 42px; font-weight: 800; color: #ebebeb; line-height: 1;
+    font-variant-numeric: tabular-nums; font-family: "BIZ UDPGothic", sans-serif;
+}
+.clock-hm .clock-colon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 0.34em; height: 1em; line-height: 0; transform: translateY(-0.07em); flex-shrink: 0;
+}
+.scene1-state { display: flex; width: 512px; height: var(--led-col-main-h); flex-direction: row; }
+
+/* ---------- 下帯（共通） ---------- */
+.foot-bar {
+    position: absolute; left: 0; bottom: 0; width: 512px; height: var(--led-foot-bar-h);
+    background: var(--led-foot-bar-bg); overflow: hidden; z-index: 12; box-sizing: border-box;
+}
+.foot-track {
+    display: flex; flex-direction: row; align-items: stretch; height: var(--led-foot-bar-h);
+    position: absolute; top: 0; left: 0; will-change: transform;
+}
+.foot-set { display: flex; flex-direction: row; align-items: stretch; height: 100%; flex-shrink: 0; }
+.foot-slot {
+    width: 256px; height: var(--led-foot-bar-h); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 6px; box-sizing: border-box; overflow: hidden;
+}
+.foot-slot-flow { width: auto; min-width: 512px; padding: 0 12px; }
+.foot-txt {
+    display: block; width: 100%; font-size: var(--led-foot-font); font-weight: 700;
+    color: #1a1a1a; line-height: var(--led-foot-bar-h); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; text-align: center;
+    font-family: "BIZ UDPGothic", sans-serif;
+}
+.foot-slot-flow .foot-txt { width: auto; text-overflow: clip; }
+/* 気温警戒バッジ（下帯左） */
+.foot-warn {
+    display: inline-block; padding: 0 8px; border-radius: 3px; margin-right: 6px;
+    font-size: 14px; font-weight: 900; line-height: 22px; color: #fff; flex-shrink: 0;
+}
+.foot-warn.lv1 { background: #E8760A; }
+.foot-warn.lv2 { background: #C1121F; }
+.foot-note { font-size: 11px; font-weight: 700; color: #5a6470; margin-left: 6px; }
+
+/* ---------- シーン2 現況コンベア ---------- */
+#scene2 .s2-panel { height: var(--led-col-main-h); }
+.s2-scroll-wrap { width: 512px; height: var(--led-col-main-h); overflow: hidden; position: relative; z-index: 1; }
+.conveyor-track { display: flex; flex-direction: row; transition: none; gap: 0; }
+.s2-val { display: flex; align-items: baseline; justify-content: center; gap: 2px; max-width: 118px; overflow: hidden; white-space: nowrap; }
+.s2-num { font-size: 44px; font-weight: 800; color: #ebebeb; line-height: 1; font-family: "BIZ UDPGothic", sans-serif; font-variant-numeric: tabular-nums; }
+.s2-unit { font-size: 20px; font-weight: 600; color: rgba(255,255,255,0.85); font-family: "BIZ UDPGothic", sans-serif; }
+.s2-unit:empty { display: none; }
+.s2-dir-text {
+    font-size: 34px; font-weight: 800; color: #ebebeb; line-height: 1;
+    font-family: "BIZ UDPGothic", sans-serif; max-width: 118px; overflow: hidden;
+    white-space: nowrap; text-align: center; text-overflow: ellipsis;
+}
+/* WxTech公式アイコン 152×112 → 表示は約58×43（画像内も左上基準） */
+.weather-icon {
+    width: 58px; height: 43px; display: block; flex-shrink: 0;
+    object-fit: contain; object-position: 0 0; image-rendering: auto;
+}
+.weather-none {
+    font-size: 28px; font-weight: 800; color: #7a8896;
+    font-family: "BIZ UDPGothic", sans-serif; line-height: 1;
+}
+.s2-tmaxmin-card {
+    display: inline-flex; align-items: baseline; justify-content: center; gap: 2px;
+    padding: 3px 7px 4px; background: #ffffff; border-radius: 8px;
+    max-width: 118px; box-sizing: border-box; overflow: hidden; white-space: nowrap; line-height: 1;
+}
+.s2-tmax-high, .s2-tmax-low { font-size: 40px; font-weight: 800; line-height: 1; font-family: "BIZ UDPGothic", sans-serif; }
+.s2-tmax-high { color: #e02020; }
+.s2-tmax-low  { color: #2060e0; }
+.s2-tmax-sep  { font-size: 40px; font-weight: 800; color: #1a1a1a; font-family: "BIZ UDPGothic", sans-serif; }
+.s2-tmax-unit { font-size: 16px; font-weight: 700; color: #1a1a1a; font-family: "BIZ UDPGothic", sans-serif; }
+
+/* ---------- シーン3 体感温度（旧WBGTシーンの置き換え） ---------- */
+#scene3 .fl-panel { height: var(--led-col-main-h); }
+.fl-scroll-wrap { width: 512px; height: var(--led-col-main-h); overflow: hidden; position: relative; z-index: 1; }
+.fl-track { display: flex; flex-direction: row; transition: none; gap: 0; }
+.fl-val {
+    display: inline-flex; align-items: baseline; justify-content: center; gap: 2px;
+    max-width: 112px; white-space: nowrap; overflow: hidden; line-height: 1; color: #ebebeb;
+}
+.fl-num { font-size: 46px; font-weight: 800; font-variant-numeric: tabular-nums; font-family: "BIZ UDPGothic", sans-serif; letter-spacing: -0.04em; }
+.fl-unit { font-size: 20px; font-weight: 700; font-family: "BIZ UDPGothic", sans-serif; line-height: 1; }
+
+/* ---------- シーン4 4日予報 ---------- */
+#scene4 .d5-panel { height: 128px; }
+.d5-track { display: flex; flex-direction: row; transition: none; gap: 0; }
+#scene4 .d5-panel .s2-top-bar { width: 100%; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+#scene4 .d5-panel .d5-body {
+    width: 100%; height: var(--led-col-body-h); flex-shrink: 0;
+    display: flex; flex-direction: row; align-items: center; justify-content: center;
+    padding: 0 4px; box-sizing: border-box; overflow: visible;
+}
+#scene4 .d5-panel .d5-foot {
+    width: 100%; height: var(--led-foot-bar-h); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+}
+.d5-foot-txt { font-size: 15px; font-weight: 700; color: #1a1a1a; font-family: "BIZ UDPGothic", sans-serif; }
+.d5-weather-row { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; gap: 2px; max-width: 120px; overflow: visible; }
+.d5-sep { font-size: 34px; font-weight: 700; line-height: 1; color: #ebebeb; font-family: "BIZ UDPGothic", sans-serif; opacity: 0.9; }
+.d5-temp { font-size: 46px; font-weight: 800; color: #ebebeb; line-height: 1; font-family: "BIZ UDPGothic", sans-serif; font-variant-numeric: tabular-nums; }
+.d5-today-frame { position: absolute; left: 0; top: 0; width: 128px; height: 128px; box-sizing: border-box; border: 2px solid #ffffff; pointer-events: none; z-index: 10; }
+.d5-panel { position: relative; }
+
+/* ---------- 取得不可 ---------- */
+#deadScreen {
+    position: absolute; left: 0; top: 0; width: 512px; height: 128px;
+    background: #2a2a2a; display: none; z-index: 50;
+}
+#deadScreen.on { display: block; }
+#deadScreen .dead-main {
+    position: absolute; left: 0; top: 30px; width: 512px; text-align: center;
+    font-size: 48px; font-weight: 900; color: #FF4A32; font-family: "BIZ UDPGothic", sans-serif;
+}
+#deadScreen .dead-sub {
+    position: absolute; left: 0; bottom: 8px; width: 512px; text-align: center;
+    font-size: 15px; font-weight: 700; color: #9aa6b2; font-family: "BIZ UDPGothic", sans-serif;
+}
+</style>
+</head>
+<body class="native-640 layout-512">
+
+<script>
+/**
+ * 現場ごとの設定
+ *
+ * wxtech.gasUrl … WxTechプロキシGASの /exec URL（APIキーはGAS側のスクリプトプロパティ）
+ * wxtech.site   … GAS の SITES キー（推奨）。指定時は lat/lon より優先
+ * wxtech.lat / lon … site 未指定時の緯度経度
+ * site.locationLabel … 画面に出す地点名
+ */
+(function (global) {
+  'use strict';
+  global.SignageConfig = {
+    site: {
+      address: '大阪府大阪市住之江区新北島１丁目９−３９',
+      locationLabel: '住之江区'
+    },
+    wxtech: {
+      gasUrl: 'https://script.google.com/macros/s/AKfycbxIdjloOZpfmMCZYLlebfviFUr434H-LlAR1GLPLhDltaRUTqx6tQHAq6Q7Fxy-d_uG/exec',
+      site: 'suminoe',
+      lat: 34.605184,
+      lon: 135.470949
+    },
+    /* 気温基準の注意喚起しきい値（厚労省：気温31℃以上）。WxTech気温に対する表示用 */
+    tempWarn: 31,
+    tempDanger: 35
+  };
+})(typeof window !== 'undefined' ? window : global);
+
+/** URL query overrides for field deployment (no rebuild) */
+(function () {
+  var q = new URLSearchParams(location.search);
+  var CFG = window.SignageConfig;
+  if (!CFG) return;
+  if (!CFG.wxtech) CFG.wxtech = {};
+  if (!CFG.site) CFG.site = {};
+
+  function pick(keys) {
+    for (var i = 0; i < keys.length; i++) {
+      var v = q.get(keys[i]);
+      if (v != null && String(v).trim() !== "") return String(v).trim();
+    }
+    return null;
+  }
+
+  var gasUrl = pick(["wxGas", "wxtechGas"]);
+  if (gasUrl) CFG.wxtech.gasUrl = gasUrl;
+
+  var siteKey = pick(["wxSite", "site"]);
+  if (siteKey) CFG.wxtech.site = siteKey;
+
+  var lat = pick(["rainLat", "lat"]);
+  if (lat != null && !isNaN(Number(lat))) CFG.wxtech.lat = Number(lat);
+
+  var lon = pick(["rainLon", "lon"]);
+  if (lon != null && !isNaN(Number(lon))) CFG.wxtech.lon = Number(lon);
+
+  var loc = pick(["loc", "locationLabel"]);
+  if (loc) CFG.site.locationLabel = loc;
+})();
+</script>
+
+<!-- 天気アイコン: 公式PNGは本番不可のため自作。余白多めで欠け防止 -->
+<svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <defs>
+  <!-- 100 晴れ -->
+  <symbol id="icon-sunny" viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="22" fill="#FFC21A"/>
+    <g stroke="#FFC21A" stroke-width="8" stroke-linecap="round">
+      <line x1="60" y1="18" x2="60" y2="30"/><line x1="60" y1="90" x2="60" y2="102"/>
+      <line x1="18" y1="60" x2="30" y2="60"/><line x1="90" y1="60" x2="102" y2="60"/>
+      <line x1="32" y1="32" x2="40" y2="40"/><line x1="80" y1="80" x2="88" y2="88"/>
+      <line x1="32" y1="88" x2="40" y2="80"/><line x1="80" y1="40" x2="88" y2="32"/>
+    </g>
+  </symbol>
+  <!-- 500 快晴 -->
+  <symbol id="icon-clear" viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="28" fill="#FFD21A"/>
+    <g stroke="#FFD21A" stroke-width="7" stroke-linecap="round">
+      <line x1="60" y1="16" x2="60" y2="26"/><line x1="60" y1="94" x2="60" y2="104"/>
+      <line x1="16" y1="60" x2="26" y2="60"/><line x1="94" y1="60" x2="104" y2="60"/>
+    </g>
+  </symbol>
+  <!-- 550 猛暑（温度計なし・赤い太陽のみ） -->
+  <symbol id="icon-heat" viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="24" fill="#FF3B14"/>
+    <g stroke="#FF3B14" stroke-width="8" stroke-linecap="round">
+      <line x1="60" y1="18" x2="60" y2="30"/><line x1="60" y1="90" x2="60" y2="102"/>
+      <line x1="18" y1="60" x2="30" y2="60"/><line x1="90" y1="60" x2="102" y2="60"/>
+      <line x1="32" y1="32" x2="40" y2="40"/><line x1="80" y1="80" x2="88" y2="88"/>
+      <line x1="32" y1="88" x2="40" y2="80"/><line x1="80" y1="40" x2="88" y2="32"/>
+    </g>
+  </symbol>
+  <!-- 600 うすぐもり -->
+  <symbol id="icon-thincloud" viewBox="0 0 120 120">
+    <circle cx="42" cy="40" r="18" fill="#FFC21A"/>
+    <g fill="#C9D6E6">
+      <circle cx="40" cy="68" r="14"/>
+      <circle cx="60" cy="62" r="18"/>
+      <circle cx="82" cy="68" r="13"/>
+      <rect x="26" y="68" width="69" height="16" rx="8"/>
+    </g>
+  </symbol>
+  <!-- 200 くもり -->
+  <symbol id="icon-cloudy" viewBox="0 0 120 120">
+    <g fill="#C9D6E6">
+      <circle cx="38" cy="56" r="16"/>
+      <circle cx="60" cy="48" r="22"/>
+      <circle cx="84" cy="56" r="15"/>
+      <rect x="22" y="56" width="78" height="20" rx="10"/>
+    </g>
+  </symbol>
+  <!-- 650 小雨 -->
+  <symbol id="icon-lightrain" viewBox="0 0 120 120">
+    <g fill="#C9D6E6">
+      <circle cx="38" cy="44" r="14"/>
+      <circle cx="58" cy="38" r="18"/>
+      <circle cx="80" cy="44" r="13"/>
+      <rect x="24" y="44" width="69" height="16" rx="8"/>
+    </g>
+    <g stroke="#3FA9F5" stroke-width="6" stroke-linecap="round">
+      <line x1="46" y1="72" x2="42" y2="92"/><line x1="70" y1="72" x2="66" y2="92"/>
+    </g>
+  </symbol>
+  <!-- 300 雨 -->
+  <symbol id="icon-rainy" viewBox="0 0 120 120">
+    <g fill="#B9C7D8">
+      <circle cx="38" cy="42" r="14"/>
+      <circle cx="58" cy="36" r="18"/>
+      <circle cx="80" cy="42" r="13"/>
+      <rect x="24" y="42" width="69" height="16" rx="8"/>
+    </g>
+    <g stroke="#3FA9F5" stroke-width="7" stroke-linecap="round">
+      <line x1="40" y1="70" x2="36" y2="94"/><line x1="60" y1="70" x2="56" y2="94"/><line x1="80" y1="70" x2="76" y2="94"/>
+    </g>
+  </symbol>
+  <!-- 400 雪 -->
+  <symbol id="icon-snow" viewBox="0 0 120 120">
+    <g fill="#C9D6E6">
+      <circle cx="38" cy="42" r="14"/>
+      <circle cx="58" cy="36" r="18"/>
+      <circle cx="80" cy="42" r="13"/>
+      <rect x="24" y="42" width="69" height="16" rx="8"/>
+    </g>
+    <g fill="#EAF6FF"><circle cx="42" cy="80" r="6"/><circle cx="60" cy="90" r="6"/><circle cx="78" cy="80" r="6"/></g>
+  </symbol>
+  <!-- 430 みぞれ -->
+  <symbol id="icon-sleet" viewBox="0 0 120 120">
+    <g fill="#C0CEDD">
+      <circle cx="38" cy="42" r="14"/>
+      <circle cx="58" cy="36" r="18"/>
+      <circle cx="80" cy="42" r="13"/>
+      <rect x="24" y="42" width="69" height="16" rx="8"/>
+    </g>
+    <line x1="42" y1="70" x2="38" y2="92" stroke="#3FA9F5" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="60" cy="86" r="6" fill="#EAF6FF"/>
+    <line x1="80" y1="70" x2="76" y2="92" stroke="#3FA9F5" stroke-width="7" stroke-linecap="round"/>
+  </symbol>
+  <!-- 850 大雨・嵐 -->
+  <symbol id="icon-storm" viewBox="0 0 120 120">
+    <g fill="#8FA3B8">
+      <circle cx="38" cy="40" r="14"/>
+      <circle cx="58" cy="34" r="18"/>
+      <circle cx="80" cy="40" r="13"/>
+      <rect x="24" y="40" width="69" height="16" rx="8"/>
+    </g>
+    <g stroke="#3FA9F5" stroke-width="7" stroke-linecap="round"><line x1="36" y1="68" x2="32" y2="90"/><line x1="84" y1="68" x2="80" y2="90"/></g>
+    <polygon points="64,60 50,88 60,84 54,102 78,70 64,74" fill="#FFE14A"/>
+  </symbol>
+  <!-- 950 大雪 -->
+  <symbol id="icon-heavysnow" viewBox="0 0 120 120">
+    <g fill="#AFC2D6">
+      <circle cx="38" cy="40" r="14"/>
+      <circle cx="58" cy="34" r="18"/>
+      <circle cx="80" cy="40" r="13"/>
+      <rect x="24" y="40" width="69" height="16" rx="8"/>
+    </g>
+    <g fill="#EAF6FF"><circle cx="40" cy="74" r="7"/><circle cx="60" cy="86" r="7"/><circle cx="80" cy="74" r="7"/><circle cx="60" cy="100" r="5"/></g>
+  </symbol>
+  <!-- 999 データなし -->
+  <symbol id="icon-none" viewBox="0 0 120 120">
+    <text x="60" y="72" text-anchor="middle" font-size="44" font-weight="800" fill="#7a8896" font-family="BIZ UDPGothic,sans-serif">--</text>
+  </symbol>
+  </defs>
+</svg>
+
+<div class="canvas">
+<div class="content-area" id="contentArea">
+
+  <div class="scene-strip-bg" aria-hidden="true">
+    <div class="col-bg-top"></div><div class="col-bg-body"></div><div class="col-bg-foot"></div>
+  </div>
+
+  <!-- シーン2: 現況（すべてWxTech srf[0]） ※時刻・社名などAPI外は出さない -->
+  <div class="scene active" id="scene2">
+    <div class="s2-scroll-wrap"><div class="conveyor-track" id="conveyor"></div></div>
+    <div class="foot-bar"><div class="foot-track" id="s2-foot-track"></div></div>
+  </div>
+
+  <!-- シーン3: 体感温度（旧WBGTシーンの置き換え。WBGTではない） -->
+  <div class="scene" id="scene3">
+    <div class="fl-scroll-wrap"><div class="fl-track" id="fl-conveyor"></div></div>
+    <div class="foot-bar"><div class="foot-track" id="s3-foot-track"></div></div>
+  </div>
+
+  <!-- シーン4: 4日予報（WxTech mrf） -->
+  <div class="scene" id="scene4">
+    <div class="d5-track" id="d5-conveyor"></div>
+  </div>
+
+  <div id="deadScreen">
+    <div class="dead-main">取得不可</div>
+    <div class="dead-sub" id="deadSub">気象データを取得できません</div>
+  </div>
+
+</div>
+<div class="logo-panel"></div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   設定
+   ============================================================ */
+var CFG = window.SignageConfig;
+var SCENE_W = 512;
+var COL_W = 128;
+var FOOT_LAP = 512;
+
+var SCENE_SLIDE_MS = 450;
+var SCENE_HOLD_MS = 1000;
+var SCROLL_PX = 0.75;
+
+var RELOAD_MS = 6 * 60 * 60 * 1000;
+
+/* 取得間隔。GAS側キャッシュ(15分)と揃える。
+   WxTechトライアルは1日1,000回・秒間10回のため、15分間隔で1地点96回/日 */
+var FETCH_MS = 15 * 60 * 1000;
+var FETCH_RETRY_MS = 60 * 1000;
+/* この時間を超えて取得できないときだけ「取得不可」。瞬断では出さない */
+var UNAVAILABLE_GRACE_MS = 60 * 1000;
+
+/* ============================================================
+   WxTech 天気コード
+   srf(短期予報)は11種のみ。mrf(中期予報)はフル表。
+   出典: WxTech APIリファレンス 天気コード(予報)
+   ============================================================ */
+/* WxTech公式 天気コード(予報) 表現一覧 */
+var WX_NAME = {
+    100:'晴れ', 101:'晴れ時々くもり', 102:'晴れ一時雨', 103:'晴れ時々雨',
+    104:'晴れ一時雪', 105:'晴れ時々雪', 106:'晴れ一時雨か雪', 107:'晴れ時々雨か雪',
+    108:'晴れ一時雨', 110:'晴れのち時々くもり', 111:'晴れのちくもり', 112:'晴れのち一時雨',
+    113:'晴れのち時々雨', 114:'晴れのち雨', 115:'晴れのち一時雪', 116:'晴れのち時々雪',
+    117:'晴れのち雪', 118:'晴れのち雨か雪', 119:'晴れのち雨か雷雨', 120:'晴れ一時雨',
+    121:'晴れ一時雨', 122:'晴れ夕方一時雨', 123:'晴れ山沿い雷雨', 124:'晴れ山沿い雪',
+    125:'晴れ午後は雷雨', 126:'晴れ昼頃から雨', 127:'晴れ夕方から雨', 128:'晴れ夜は雨',
+    129:'晴れ夜半から雨', 130:'朝の内霧のち晴れ', 131:'晴れ朝方霧', 132:'晴れ時々くもり',
+    140:'晴れ時々雨', 160:'晴れ一時雪か雨', 170:'晴れ時々雪か雨', 181:'晴れのち雪か雨',
+    200:'くもり', 201:'くもり時々晴れ', 202:'くもり一時雨', 203:'くもり時々雨',
+    204:'くもり一時雪', 205:'くもり時々雪', 206:'くもり一時雨か雪', 207:'くもり時々雨か雪',
+    208:'くもり一時雨か雷雨', 209:'霧', 210:'くもりのち時々晴れ', 211:'くもりのち晴れ',
+    212:'くもりのち一時雨', 213:'くもりのち時々雨', 214:'くもりのち雨', 215:'くもりのち一時雪',
+    216:'くもりのち時々雪', 217:'くもりのち雪', 218:'くもりのち雨か雪', 219:'くもりのち雨か雷雨',
+    220:'くもり朝夕一時雨', 221:'くもり朝の内一時雨', 222:'くもり夕方一時雨', 223:'くもり日中時々晴れ',
+    224:'くもり昼頃から雨', 225:'くもり夕方から雨', 226:'くもり夜は雨', 227:'くもり夜半から雨',
+    228:'くもり昼頃から雪', 229:'くもり夕方から雪', 230:'くもり夜は雪', 231:'くもり海上海岸は霧か霧雨',
+    240:'くもり時々雨で雷を伴う', 250:'くもり時々雪で雷を伴う', 260:'くもり一時雪か雨',
+    270:'くもり時々雪か雨', 281:'くもりのち雪か雨',
+    300:'雨', 301:'雨時々晴れ', 302:'雨時々止む', 303:'雨時々雪', 304:'雨か雪',
+    306:'大雨', 308:'雨で暴風を伴う', 309:'雨一時雪', 311:'雨のち晴れ', 313:'雨のちくもり',
+    314:'雨のち時々雪', 315:'雨のち雪', 316:'雨か雪のち晴れ', 317:'雨か雪のちくもり',
+    320:'朝の内雨のち晴れ', 321:'朝の内雨のちくもり', 322:'雨朝晩一時雪', 323:'雨昼頃から晴れ',
+    324:'雨夕方から晴れ', 325:'雨夜は晴れ', 326:'雨夕方から雪', 327:'雨夜は雪',
+    328:'雨一時強く降る', 329:'雨一時みぞれ', 340:'雪か雨', 350:'雷',
+    361:'雪か雨のち晴れ', 371:'雪か雨のちくもり',
+    400:'雪', 401:'雪時々晴れ', 402:'雪時々止む', 403:'雪時々雨', 405:'大雪',
+    406:'風雪強い', 407:'暴風雪', 409:'雪一時雨', 411:'雪のち晴れ', 413:'雪のちくもり',
+    414:'雪のち雨', 420:'朝の内雪のち晴れ', 421:'朝の内雪のちくもり', 422:'雪昼頃から雨',
+    423:'雪夕方から雨', 424:'雪夜半から雨', 425:'雪一時強く降る', 426:'雪のちみぞれ',
+    427:'雪一時みぞれ', 430:'みぞれ', 450:'雪で雷を伴う',
+    500:'快晴', 550:'猛暑', 552:'猛暑時々曇り', 553:'猛暑時々雨', 558:'猛暑時々大雨・嵐',
+    562:'猛暑のち曇り', 563:'猛暑のち雨', 568:'猛暑のち大雨・嵐', 572:'曇り時々猛暑',
+    573:'雨時々猛暑', 582:'曇りのち猛暑', 583:'雨のち猛暑',
+    600:'うすぐもり', 650:'小雨', 800:'雷',
+    850:'大雨・嵐', 851:'大雨・嵐時々晴れ', 852:'大雨・嵐時々曇り', 853:'大雨・嵐時々雨',
+    854:'大雨・嵐時々雪', 855:'大雨・嵐時々猛暑', 859:'大雨・嵐一時大雪',
+    861:'大雨・嵐のち晴れ', 862:'大雨・嵐のち曇り', 863:'大雨・嵐のち雨', 864:'大雨・嵐のち雪',
+    865:'大雨・嵐のち猛暑', 869:'大雨・嵐のち大雪', 871:'晴れ時々大雨・嵐', 872:'曇り時々大雨・嵐',
+    873:'雨時々大雨・嵐', 874:'雪時々大雨・嵐', 881:'晴れのち大雨・嵐', 882:'曇りのち大雨・嵐',
+    883:'雨のち大雨・嵐', 884:'雪のち大雨・嵐',
+    950:'大雪', 951:'大雪時々晴れ', 952:'大雪時々曇', 953:'大雪一時雨', 954:'大雪時々雪',
+    958:'大雪一時大雨', 961:'大雪のち晴れ', 962:'大雪のち曇', 963:'大雪のち雨', 964:'大雪のち雪',
+    968:'大雪のち大雨・嵐', 971:'晴れ一時大雪', 972:'曇一時大雪', 973:'雨一時大雪', 974:'雪一時大雪',
+    981:'晴れのち大雪', 982:'曇のち大雪', 983:'雨のち大雪', 984:'雪のち大雪',
+    999:'--'
+};
+
+/**
+ * WxTech公式天気アイコン
+ * https://tpf.weathernews.jp/wxicon/152/[wx].png
+ * ※リファレンス上は「サンプルのため本番利用はご遠慮ください」。
+ *   依頼により公式URLを使用。サイネージ機から tpf.weathernews.jp へ到達できること。
+ */
+var WX_ICON_BASE = 'https://tpf.weathernews.jp/wxicon/152/';
+function wxIconUrl(code) {
+    var c = Number(code);
+    if (!isFinite(c) || c <= 0 || c === 999) return '';
+    return WX_ICON_BASE + Math.floor(c) + '.png';
+}
+function wxIconHtml(code) {
+    var url = wxIconUrl(code);
+    if (!url) return '<span class="weather-none">--</span>';
+    return '<img class="weather-icon" src="' + url + '" alt="" width="58" height="43" decoding="async">';
+}
+function wxName(code) {
+    return WX_NAME[Number(code)] || '';
+}
+
+/* 風向 1〜16。※公式「風向定義一覧」で要確認（暫定で1=北） */
+var WIND_DIRS = ['','北','北北東','北東','東北東','東','東南東','南東','南南東',
+                 '南','南南西','南西','西南西','西','西北西','北西','北北西'];
+function windDirName(v) {
+    var i = Number(v);
+    return (i >= 1 && i <= 16) ? WIND_DIRS[i] : '--';
+}
+
+/* ============================================================
+   段階色（気温基準。WBGTではない）
+   厚労省2025年6月施行の基準のうち「気温31℃以上」だけを根拠に使う
+   ============================================================ */
+var LEVELS = [
+    { min: -99, idx: 0, bg: '#308DD8', bar: '#55A5E6', dark: false, label: '' },
+    { min: 31,  idx: 1, bg: '#FF7E00', bar: '#FF9A38', dark: true,  label: '気温警戒' },
+    { min: 35,  idx: 2, bg: '#D61914', bar: '#E94540', dark: false, label: '気温危険' }
+];
+var UNKNOWN_COLORS = { bg: '#2a2a2a', bar: '#3a3a3a', dark: false };
+
+function tempLevelIdx(temp) {
+    if (temp == null || !isFinite(temp)) return -1;
+    if (temp >= CFG.tempDanger) return 2;
+    if (temp >= CFG.tempWarn) return 1;
+    return 0;
+}
+function levelColors(idx) {
+    if (idx == null || idx < 0) return UNKNOWN_COLORS;
+    var row = LEVELS[Math.max(0, Math.min(2, idx))];
+    return { bg: row.bg, bar: row.bar, dark: row.dark };
+}
+
+/* ============================================================
+   状態
+   ============================================================ */
+var state = {
+    ok: false,
+    now: null,        // srf[0] WxTech
+    daily: [],        // mrf WxTech
+    fetchedAt: null,
+    levelIdx: -1
+};
+var unavailable = false;
+var failSinceMs = null;
+var lastError = '';
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/** WxTech date 文字列 (例 2026-07-22T14:00:00+09:00) を表示用に */
+function formatWxDate(iso) {
+    if (!iso) return '';
+    var m = String(iso).match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return '';
+    return Number(m[2]) + '/' + Number(m[3]) + ' ' + m[4] + ':' + m[5];
+}
+function formatWxDayLabel(iso) {
+    if (!iso) return '--';
+    var m = String(iso).match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '--';
+    return Number(m[2]) + '/' + Number(m[3]);
+}
+
+/* ============================================================
+   データ取得（WxTech → GASプロキシ経由 / JSONP）
+   ★取得できなければ「取得不可」だけを出す。
+     前回値の使い回し・推定値・他ソースからの代替値は一切しない。
+   ============================================================ */
+function buildUrl(callbackName) {
+    var w = CFG.wxtech;
+    var qs;
+    if (w.site) {
+        qs = 'site=' + encodeURIComponent(w.site);
+    } else {
+        qs = 'lat=' + encodeURIComponent(w.lat) +
+            '&lon=' + encodeURIComponent(w.lon);
+    }
+    if (callbackName) qs += '&callback=' + encodeURIComponent(callbackName);
+    qs += '&t=' + Date.now();
+    return w.gasUrl + (w.gasUrl.indexOf('?') >= 0 ? '&' : '?') + qs;
+}
+
+function applyPayload(d) {
+    if (!d || !d.ok || !d.now) return false;
+    state.ok = true;
+    state.now = d.now;
+    state.daily = (d.daily || []).slice(0, 4);
+    state.fetchedAt = d.fetchedAt || null;
+    state.levelIdx = tempLevelIdx(Number(d.now.temp));
+    failSinceMs = null;
+    unavailable = false;
+    lastError = '';
+    return true;
+}
+
+function noteFailure(errMsg, hard) {
+    if (errMsg) lastError = String(errMsg).slice(0, 120);
+    var nowMs = Date.now();
+    if (failSinceMs == null) failSinceMs = nowMs;
+    // APIが ok:false を返した／JSONPが壊れている場合は即「取得不可」
+    if (hard || nowMs - failSinceMs >= UNAVAILABLE_GRACE_MS) {
+        unavailable = true;
+        state.ok = false;
+        state.levelIdx = -1;
+    }
+}
+
+var fetchTimerId = null;
+
+function loadDataViaFetch() {
+    return fetch(buildUrl(), { cache: 'no-store', redirect: 'follow' })
+        .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(function (d) {
+            if (!applyPayload(d)) throw new Error((d && d.reason) ? d.reason : 'bad payload');
+            renderAll();
+            return true;
+        });
+}
+
+function loadDataViaJsonp() {
+    return new Promise(function (resolve, reject) {
+        var cb = 'wxCb' + String(Date.now());
+        var script = document.createElement('script');
+        var done = false;
+        var timer = setTimeout(function () { finish(new Error('timeout')); }, 15000);
+
+        function finish(err) {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+            if (err) reject(err);
+            else resolve(true);
+        }
+
+        window[cb] = function (d) {
+            // 新GASは wxCb(...)。旧GASは素のJSONが来てここは呼ばれない
+            if (!applyPayload(d)) {
+                finish(new Error((d && d.reason) ? d.reason : 'bad payload'));
+                return;
+            }
+            renderAll();
+            finish(null);
+        };
+        script.onerror = function () { finish(new Error('JSONP失敗')); };
+        script.src = buildUrl(cb);
+        document.head.appendChild(script);
+    });
+}
+
+function loadData() {
+    return loadDataViaFetch()
+        .catch(function (e1) {
+            console.warn('[WxTech] fetch失敗 → JSONP再試行:', e1 && e1.message ? e1.message : e1);
+            return loadDataViaJsonp();
+        })
+        .catch(function (e2) {
+            console.warn('[WxTech] 取得失敗:', e2 && e2.message ? e2.message : e2);
+            noteFailure(e2 && e2.message ? e2.message : 'fail', true);
+            renderAll();
+            return false;
+        });
+}
+function scheduleFetch() {
+    if (fetchTimerId) clearTimeout(fetchTimerId);
+    var delay = unavailable || !state.ok ? FETCH_RETRY_MS : FETCH_MS;
+    fetchTimerId = setTimeout(function () {
+        loadData().then(scheduleFetch);
+    }, delay);
+}
+
+/* ============================================================
+   描画
+   ============================================================ */
+function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function num(v, digits) {
+    if (v == null || v === '' || !isFinite(Number(v))) return '--';
+    return digits ? Number(v).toFixed(digits) : String(Math.round(Number(v)));
+}
+
+function applyBackground() {
+    var c = levelColors(unavailable ? -1 : state.levelIdx);
+    var area = document.getElementById('contentArea');
+    var bg = area.querySelector('.scene-strip-bg');
+    area.style.backgroundColor = c.bg;
+    area.classList.toggle('col-bg-dark-text', !!c.dark);
+    if (bg) {
+        bg.querySelector('.col-bg-top').style.backgroundColor = c.bar;
+        bg.querySelector('.col-bg-body').style.backgroundColor = c.bg;
+    }
+    document.getElementById('deadScreen').classList.toggle('on', unavailable);
+    var sub = document.getElementById('deadSub');
+    if (sub) {
+        sub.textContent = lastError
+            ? String(lastError).slice(0, 80)
+            : '気象データを取得できません';
+    }
+}
+
+/* ---- 下帯: WxTech srf の日時・天気・気温のみ ---- */
+function wxFootMessage() {
+    if (unavailable) return '気象データ取得不可';
+    if (!state.now) return '';
+    var parts = [];
+    var dt = formatWxDate(state.now.date);
+    if (dt) parts.push(dt);
+    var nm = wxName(state.now.wx);
+    if (nm) parts.push(nm);
+    if (state.now.temp != null) parts.push(num(state.now.temp) + '℃');
+    if (state.now.feeltmp != null) parts.push('体感' + num(state.now.feeltmp) + '℃');
+    return parts.join('　');
+}
+function wxFootWarnHtml() {
+    if (unavailable || state.levelIdx <= 0) return '';
+    var row = LEVELS[state.levelIdx];
+    return '<span class="foot-warn lv' + state.levelIdx + '">' + esc(row.label) + '</span>';
+}
+
+/* ---- シーン2 現況（すべて srf[0] / mrf から。WxTechのみ） ---- */
+var S2_ITEMS = [
+    { key:'weather', label:'天気' },
+    { key:'temp',    label:'気温' },
+    { key:'feeltmp', label:'体感温度' },
+    { key:'rhum',    label:'湿度' },
+    { key:'prec',    label:'降水量' },
+    { key:'wnddir',  label:'風向き' },
+    { key:'wndspd',  label:'風速' },
+    { key:'arpress', label:'気圧' },
+    { key:'tmaxmin', label:'最高/最低' }
+];
+function s2PanelHtml(item) {
+    var n = state.now || {};
+    var body = '';
+    if (unavailable) {
+        body = '<div class="s2-val"><span class="s2-num">--</span></div>';
+    } else if (item.key === 'weather') {
+        body = wxIconHtml(n.wx);
+    } else if (item.key === 'wnddir') {
+        body = '<div class="s2-dir-text">' + esc(windDirName(n.wnddir)) + '</div>';
+    } else if (item.key === 'tmaxmin') {
+        var d0 = state.daily[0] || {};
+        body = '<div class="s2-tmaxmin-card">' +
+               '<span class="s2-tmax-high">' + num(d0.maxtemp) + '</span>' +
+               '<span class="s2-tmax-sep">/</span>' +
+               '<span class="s2-tmax-low">' + num(d0.mintemp) + '</span>' +
+               '<span class="s2-tmax-unit">℃</span></div>';
+    } else {
+        var val, unit;
+        switch (item.key) {
+            case 'temp':    val = num(n.temp);      unit = '℃';   break;
+            case 'feeltmp': val = num(n.feeltmp);   unit = '℃';   break;
+            case 'rhum':    val = num(n.rhum);      unit = '%';   break;
+            case 'prec':    val = num(n.prec, 1);   unit = 'mm';  break;
+            case 'wndspd':  val = num(n.wndspd, 1); unit = 'm/s'; break;
+            case 'arpress': val = num(n.arpress);   unit = 'hPa'; break;
+            default:        val = '--';             unit = '';
+        }
+        body = '<div class="s2-val"><span class="s2-num">' + val + '</span><span class="s2-unit">' + unit + '</span></div>';
+    }
+    return '<div class="s2-panel">' +
+           '<div class="s2-top-bar"><span class="s2-bar-label">' + esc(item.label) + '</span></div>' +
+           '<div class="s2-body">' + body + '</div></div>';
+}
+var scene2SetWidth = S2_ITEMS.length * COL_W;
+function buildScene2() {
+    var one = S2_ITEMS.map(s2PanelHtml).join('');
+    var el = document.getElementById('conveyor');
+    el.innerHTML = one + one;
+    scene2SetWidth = S2_ITEMS.length * COL_W;
+    el.style.width = (scene2SetWidth * 2) + 'px';
+    fitScene2Text();
+}
+function fitScene2Text() {
+    var maxW = 116;
+    document.querySelectorAll('#scene2 .s2-bar-label').forEach(function (el) {
+        var s = 20; el.style.fontSize = s + 'px';
+        while (s > 13 && el.scrollWidth > maxW) { s -= 1; el.style.fontSize = s + 'px'; }
+    });
+    document.querySelectorAll('#scene2 .s2-val').forEach(function (wrap) {
+        var n = wrap.querySelector('.s2-num'); if (!n) return;
+        var s = 44; n.style.fontSize = s + 'px';
+        while (s > 24 && wrap.scrollWidth > maxW) { s -= 1; n.style.fontSize = s + 'px'; }
+    });
+    document.querySelectorAll('#scene2 .s2-dir-text').forEach(function (el) {
+        var s = 34; el.style.fontSize = s + 'px';
+        while (s > 20 && el.scrollWidth > maxW) { s -= 1; el.style.fontSize = s + 'px'; }
+    });
+    document.querySelectorAll('#scene2 .s2-tmaxmin-card').forEach(function (card) {
+        var s = 40;
+        var set = function () {
+            card.querySelectorAll('.s2-tmax-high,.s2-tmax-low,.s2-tmax-sep').forEach(function (n) { n.style.fontSize = s + 'px'; });
+        };
+        set();
+        while (s > 24 && card.scrollWidth > maxW) { s -= 1; set(); }
+    });
+}
+function buildS2Foot() {
+    var track = document.getElementById('s2-foot-track');
+    var note = state.levelIdx > 0 && !unavailable ? '<span class="foot-note">気温基準</span>' : '';
+    var txt = wxFootWarnHtml() + esc(wxFootMessage()) + note;
+    var slot = '<div class="foot-slot foot-slot-flow"><span class="foot-txt">' + txt + '</span></div>';
+    track.innerHTML = '<div class="foot-set">' + slot + '</div><div class="foot-set">' + slot + '</div>';
+}
+
+/* ---- シーン3 体感温度 / 気温（WxTech feeltmp・tempのみ） ---- */
+var FL_LABELS = ['体感温度', '気温'];
+var scene3SetWidth = 4 * COL_W;
+function buildScene3() {
+    var n = state.now || {};
+    var one = '';
+    for (var i = 0; i < 4; i++) {
+        var isFeel = (i % 2 === 0);
+        var v = unavailable ? '--' : num(isFeel ? n.feeltmp : n.temp);
+        one += '<div class="fl-panel">' +
+               '<div class="fl-top-bar"><span class="fl-bar-label">' + FL_LABELS[i % 2] + '</span></div>' +
+               '<div class="fl-body"><div class="fl-val">' +
+               '<span class="fl-num">' + v + '</span><span class="fl-unit">℃</span>' +
+               '</div></div></div>';
+    }
+    var el = document.getElementById('fl-conveyor');
+    el.innerHTML = one + one;
+    scene3SetWidth = 4 * COL_W;
+    el.style.width = (scene3SetWidth * 2) + 'px';
+}
+function buildS3Foot() {
+    var track = document.getElementById('s3-foot-track');
+    var txt;
+    if (unavailable) {
+        txt = '気象データ取得不可';
+    } else {
+        var n = state.now || {};
+        var parts = [];
+        if (n.feeltmp != null) parts.push('体感' + num(n.feeltmp) + '℃');
+        if (n.feelidx != null) parts.push('体感指数' + num(n.feelidx));
+        if (n.temp != null) parts.push('気温' + num(n.temp) + '℃');
+        txt = parts.join('　') || wxFootMessage();
+    }
+    var slot = '<div class="foot-slot foot-slot-flow"><span class="foot-txt">' + esc(txt) + '</span></div>';
+    track.innerHTML = '<div class="foot-set">' + slot + '</div><div class="foot-set">' + slot + '</div>';
+}
+
+/* ---- シーン4 4日予報（mrfのみ。日付もWxTechの date） ---- */
+var scene4SetWidth = 4 * COL_W;
+function buildScene4() {
+    var one = '';
+    for (var i = 0; i < 4; i++) {
+        var d = state.daily[i] || {};
+        var label = unavailable ? '--' : formatWxDayLabel(d.date);
+        var iconHtml = unavailable ? '<span class="weather-none">--</span>' : wxIconHtml(d.wx);
+        var mx = unavailable ? '--' : num(d.maxtemp);
+        var mn = unavailable ? '--' : num(d.mintemp);
+        var pop = unavailable || d.pop == null ? '--' : num(d.pop);
+        one += '<div class="d5-panel">' +
+               '<div class="s2-top-bar"><span class="s2-bar-label">' + esc(label) + '</span></div>' +
+               '<div class="d5-body"><div class="d5-weather-row">' +
+               iconHtml +
+               '<span class="d5-sep">/</span>' +
+               '<span class="d5-temp">' + mx + '</span>' +
+               '</div></div>' +
+               '<div class="d5-foot"><span class="d5-foot-txt">' + mn + '℃ / ' + pop + '%</span></div>' +
+               (i === 0 ? '<div class="d5-today-frame" aria-hidden="true"></div>' : '') +
+               '</div>';
+    }
+    var el = document.getElementById('d5-conveyor');
+    el.innerHTML = one + one;
+    scene4SetWidth = 4 * COL_W;
+    el.style.width = (scene4SetWidth * 2) + 'px';
+    fitScene4Text();
+}
+function fitScene4Text() {
+    document.querySelectorAll('#scene4 .d5-weather-row').forEach(function (row) {
+        var t = row.querySelector('.d5-temp'); if (!t) return;
+        var s = 46; t.style.fontSize = s + 'px';
+        while (s > 28 && row.scrollWidth > 120) { s -= 1; t.style.fontSize = s + 'px'; }
+    });
+}
+
+function renderAll() {
+    applyBackground();
+    buildScene2(); buildS2Foot();
+    buildScene3(); buildS3Foot();
+    buildScene4();
+}
+
+/* ============================================================
+   スクロール & シーン送り
+   ============================================================ */
+var globalX = 0;
+function wrapX(x, lap) {
+    if (!lap || lap <= 0) return x;
+    var v = x;
+    while (v <= -lap) v += lap;
+    while (v > 0) v -= lap;
+    return v;
+}
+function applyX(el, x) { if (el) el.style.transform = 'translate3d(' + Math.round(x) + 'px,0,0)'; }
+function applyGlobal(el, lap) { if (el && lap) applyX(el, wrapX(globalX, lap)); }
+function advance() { globalX -= SCROLL_PX; }
+
+var animId = null, holdId = null, slideId = null;
+function clearAnims() {
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    if (holdId) { clearTimeout(holdId); holdId = null; }
+}
+function afterHold(fn) {
+    if (holdId) clearTimeout(holdId);
+    holdId = setTimeout(function () { holdId = null; fn(); }, SCENE_HOLD_MS);
+}
+function activeScene() { return document.querySelector('.content-area .scene.active'); }
+function hideScene(el) { if (!el) return; el.classList.remove('active'); el.style.display = 'none'; el.style.transform = ''; el.style.zIndex = ''; }
+
+function transitionTo(next, onDone) {
+    clearAnims();
+    if (slideId) { cancelAnimationFrame(slideId); slideId = null; }
+    var cur = activeScene();
+    if (!next) { onDone && onDone(); return; }
+    if (cur === next) { onDone && onDone(); return; }
+    next.style.display = 'block';
+    next.classList.add('active');
+    if (!cur) { applyX(next, 0); onDone && onDone(); return; }
+    next.style.zIndex = '2'; cur.style.zIndex = '1';
+    applyX(next, SCENE_W);
+    onDone && onDone();
+    var t0 = performance.now();
+    (function tick(now) {
+        var p = Math.min(1, (now - t0) / SCENE_SLIDE_MS);
+        var off = Math.round(p * (2 - p) * SCENE_W);
+        applyX(cur, -off); applyX(next, SCENE_W - off);
+        if (p < 1) slideId = requestAnimationFrame(tick);
+        else { slideId = null; hideScene(cur); applyX(next, 0); next.style.zIndex = ''; }
+    })(performance.now());
+}
+
+/* --- シーン1(時刻)は削除。WxTechシーンのみ循環 --- */
+
+function makeConveyorScene(sceneId, trackId, footTrackId, setWidthGetter, laps, nextFn, prepFn) {
+    return function () {
+        clearAnims();
+        applyBackground();
+        if (prepFn) prepFn();
+        var track = document.getElementById(trackId);
+        var foot = footTrackId ? document.getElementById(footTrackId) : null;
+        var setW = setWidthGetter();
+        if (!setW) { nextFn(); return; }
+        var total = setW * laps, moved = 0;
+        applyGlobal(track, setW);
+        if (foot) applyGlobal(foot, FOOT_LAP);
+        afterHold(function step() {
+            advance(); moved += SCROLL_PX;
+            applyGlobal(track, setW);
+            if (foot) applyGlobal(foot, FOOT_LAP);
+            if (moved >= total) { animId = null; nextFn(); return; }
+            animId = requestAnimationFrame(step);
+        });
+    };
+}
+
+var playScene2 = makeConveyorScene('scene2', 'conveyor', 's2-foot-track',
+    function () { return scene2SetWidth; }, 2,
+    function () { transitionTo(document.getElementById('scene3'), playScene3); },
+    function () { buildScene2(); buildS2Foot(); });
+
+var playScene3 = makeConveyorScene('scene3', 'fl-conveyor', 's3-foot-track',
+    function () { return scene3SetWidth; }, 2,
+    function () { transitionTo(document.getElementById('scene4'), playScene4); },
+    function () { buildScene3(); buildS3Foot(); });
+
+var playScene4 = makeConveyorScene('scene4', 'd5-conveyor', null,
+    function () { return scene4SetWidth; }, 2,
+    function () { transitionTo(document.getElementById('scene2'), playScene2); },
+    function () { buildScene4(); });
+
+/* ============================================================
+   起動
+   ============================================================ */
+window.onload = function () {
+    renderAll();
+
+    var onlyQ = new URLSearchParams(location.search).get('only') || '';
+    var onlyStart = null;
+    if (onlyQ === 's2' || onlyQ === 'scene2' || onlyQ === 'current') onlyStart = playScene2;
+    else if (onlyQ === 's3' || onlyQ === 'scene3' || onlyQ === 'feel') onlyStart = playScene3;
+    else if (onlyQ === 's4' || onlyQ === 'scene4' || onlyQ === 'forecast') onlyStart = playScene4;
+
+    Promise.race([
+        loadData(),
+        new Promise(function (r) { setTimeout(r, 3500); })
+    ]).then(function () {
+        scheduleFetch();
+        (onlyStart || playScene2)();
+    });
+
+    setTimeout(function () { location.reload(true); }, RELOAD_MS);
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') loadData();
+    });
+};
+</script>
+</body>
+</html>
